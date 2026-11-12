@@ -11,8 +11,8 @@ export interface PhoneViewProps {
   status: ConnStatus;
   /** Buttons currently held down. */
   pressed: ReadonlySet<string>;
-  /** Button id -> error code, oldest first; the newest one is spoken in the live region. */
-  errors: Readonly<Record<string, string>>;
+  /** [button id, error code] pairs, oldest first; the newest one is spoken in the live region. */
+  errors: ReadonlyArray<readonly [string, string]>;
   t: (key: string, vars?: Record<string, string>) => string;
   onDown(id: string): void;
   onUp(id: string): void;
@@ -44,8 +44,8 @@ export function PhoneView(p: PhoneViewProps) {
   const rows = layout ? int(layout.grid.rows, 4) : 4;
   const pages = layout?.pages ?? [];
   const empty = layout !== null && pages.every((pg) => pg.buttons.length === 0);
-  const codes = Object.values(p.errors);
-  const errorCode = codes[codes.length - 1];
+  const errorCode = p.errors[p.errors.length - 1]?.[1];
+  const current = Math.min(page, Math.max(pages.length - 1, 0)); // pages may shrink on a layout update
   const errorLine = errorCode ? (t(`error.${errorCode}`) === `error.${errorCode}` ? t("error.unknown") : t(`error.${errorCode}`)) : "";
 
   const goTo = (i: number) => {
@@ -77,7 +77,7 @@ export function PhoneView(p: PhoneViewProps) {
           theme={layout!.theme}
           iconSrc={b.icon.kind === "image" ? `/icons/${encodeURIComponent(b.icon.file)}` : undefined}
           pressed={p.pressed.has(id)}
-          error={id in p.errors}
+          error={p.errors.some(([e]) => e === id)}
           disabled={!open}
         />
       </button>
@@ -114,7 +114,7 @@ export function PhoneView(p: PhoneViewProps) {
               type="button"
               className="dot"
               aria-label={pg.name || t("phone.page", { n: String(i + 1) })}
-              aria-current={i === page ? "true" : undefined}
+              aria-current={i === current ? "true" : undefined}
               onClick={() => goTo(i)}
             />
           ))}

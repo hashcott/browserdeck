@@ -104,3 +104,34 @@ test("close() stops reconnecting", () => {
   vi.advanceTimersByTime(60000);
   expect(FakeWS.all).toHaveLength(1);
 });
+
+test("pending presses resolve timeout when the socket drops", async () => {
+  const c = make(); last().open();
+  const p = c.press("b");
+  last().drop();
+  expect(await p).toEqual({ ok: false, error: "timeout" });
+});
+test("pending presses resolve timeout on close()", async () => {
+  const c = make(); last().open();
+  const p = c.press("b");
+  c.close();
+  expect(await p).toEqual({ ok: false, error: "timeout" });
+});
+test("a late result after the timeout is ignored", async () => {
+  const c = make(); last().open();
+  const first = c.press("a");
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(await first).toEqual({ ok: false, error: "timeout" });
+  const second = c.press("b");
+  last().recv({ type: "result", press_id: 1, ok: true, error: null }); // late, for the first press
+  let done = false; void second.then(() => (done = true));
+  await Promise.resolve();
+  expect(done).toBe(false);
+  last().recv({ type: "result", press_id: 2, ok: true, error: null });
+  expect(await second).toEqual({ ok: true });
+});
+test("a second onclose does not schedule a second reconnect", () => {
+  make(); const s = last(); s.drop(); s.onclose?.();
+  vi.advanceTimersByTime(60000);
+  expect(FakeWS.all).toHaveLength(2);
+});
