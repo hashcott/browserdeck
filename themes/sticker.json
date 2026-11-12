@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "sticker",
+  "name": "Sticker",
+  "author": "",
+  "ground": "#1b1830",
+  "ink": "#ffffff",
+  "actions": {
+    "launch": "#3b82f6",
+    "hotkey": "#ffc93c",
+    "volume": "#22c58b",
+    "obs_scene": "#ff4f81"
+  },
+  "key": {
+    "radius": 20,
+    "gap": 14,
+    "border_width": 6,
+    "border_color": "#ffffff",
+    "depth": "sticker",
+    "press": "lift",
+    "legend": "center"
+  }
+}

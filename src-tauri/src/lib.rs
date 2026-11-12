@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod config;
-
+#[allow(dead_code)]
+mod themes;
 
 pub fn run() {
     tauri::Builder::default()

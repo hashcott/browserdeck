@@ -183,8 +183,7 @@ impl Config {
                     return Err(LabelTooLong);
                 }
                 if let Some(c) = &b.color {
-                    let ok = c.len() == 7 && c.starts_with('#') && c[1..].bytes().all(|x| x.is_ascii_hexdigit());
-                    if !ok {
+                    if !is_hex_color(c) {
                         return Err(BadColor);
                     }
                 }
@@ -201,6 +200,11 @@ impl Config {
     pub fn find_button(&self, id: &str) -> Option<&Button> {
         self.pages.iter().flat_map(|p| &p.buttons).find(|b| b.id == id)
     }
+}
+
+/// `^#[0-9a-fA-F]{6}$`
+pub(crate) fn is_hex_color(c: &str) -> bool {
+    c.len() == 7 && c.starts_with('#') && c[1..].bytes().all(|x| x.is_ascii_hexdigit())
 }
 
 /// `^[0-9a-f-]{36}\.(png|jpg|jpeg|webp)$`

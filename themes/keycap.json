@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "keycap",
+  "name": "Keycap",
+  "author": "",
+  "ground": "#22252b",
+  "ink": "#f6f1e4",
+  "actions": {
+    "launch": "#f6f1e4",
+    "hotkey": "#2c3a55",
+    "volume": "#6f7d4f",
+    "obs_scene": "#e8703a"
+  },
+  "key": {
+    "radius": 9,
+    "gap": 9,
+    "border_width": 1,
+    "border_color": "#1a1c20",
+    "depth": "dish",
+    "press": "sink",
+    "legend": "top_left"
+  }
+}

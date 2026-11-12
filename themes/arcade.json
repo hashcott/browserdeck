@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "arcade",
+  "name": "Arcade",
+  "author": "",
+  "ground": "#14123a",
+  "ink": "#f4f3ff",
+  "actions": {
+    "launch": "#2f7bff",
+    "hotkey": "#ffd400",
+    "volume": "#19c37d",
+    "obs_scene": "#ff4040"
+  },
+  "key": {
+    "radius": 17,
+    "gap": 14,
+    "border_width": 0,
+    "border_color": "#000000",
+    "depth": "raised",
+    "press": "sink",
+    "legend": "center"
+  }
+}
