@@ -102,7 +102,7 @@
   "editor.path": "Chương trình",
   "editor.chooseFile": "Chọn tệp…",
   "editor.args": "Tham số",
-  "editor.argsHint": "Cách nhau bằng dấu cách.",
+  "editor.argsHint": "Các tham số cách nhau bằng dấu cách. Đặt tham số trong \"dấu ngoặc kép\" nếu nó chứa dấu cách.",
   "editor.hotkeyNone": "Chưa có phím",
   "editor.hotkeyPress": "Nhấn tổ hợp phím rồi nhả ra…",
   "editor.hotkeyRecord": "Ghi phím",
@@ -116,5 +116,9 @@
   "editor.renamePage": "Đổi tên trang",
   "editor.deletePage": "Xoá trang",
   "editor.testOk": "Xong",
-  "editor.recovered": "Tệp cài đặt bị hỏng nên đã được đặt lại. Tệp cũ được giữ với tên {file}."
+  "editor.recovered": "Tệp cài đặt bị hỏng nên đã được đặt lại. Tệp cũ được giữ với tên {file}.",
+  "common.retry": "Thử lại",
+  "editor.hotkeyUnsupported": "Phím này không được hỗ trợ. Hãy thử phím khác.",
+  "editor.hotkeyNeedsKey": "Hãy thêm một phím ngoài Ctrl, Shift, Alt hoặc Win/Cmd.",
+  "editor.slotTaken": "Ô đó đã có nút."
 }

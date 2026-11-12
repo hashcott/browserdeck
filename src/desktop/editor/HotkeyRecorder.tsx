@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SUPPORTED_KEY_CODES } from "../../shared/keyCodes";
 import { Icon } from "./Icons";
 
 const MODS = ["Control", "Alt", "Shift", "Meta"];
@@ -29,6 +30,14 @@ export const formatChord = (keys: string[], platform: string) => keys.map((k) =>
 /** Modifiers first (the core presses in order), otherwise the order the keys went down. */
 const ordered = (codes: string[]) => [...codes.filter(isMod), ...codes.filter((c) => !isMod(c))];
 
+/** Whether a pressed key may be part of a chord: only codes the core can send. */
+export const isSupportedKey = (code: string) => SUPPORTED_KEY_CODES.includes(code);
+
+/** Whether a finished recording may be saved: it needs at least one non-modifier key. */
+export function finishChord(seen: string[]): { ok: true; keys: string[] } | { ok: false } {
+  return seen.some((c) => !isMod(c)) ? { ok: true, keys: ordered(seen) } : { ok: false };
+}
+
 interface Props {
   keys: string[];
   platform: string;
@@ -40,6 +49,7 @@ interface Props {
 export function HotkeyRecorder({ keys, platform, t, onChange }: Props) {
   const [recording, setRecording] = useState(false);
   const [live, setLive] = useState<string[]>([]);
+  const [hint, setHint] = useState<string | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const emit = useRef(onChange);
   emit.current = onChange; // the listeners below must survive parent re-renders
@@ -48,12 +58,14 @@ export function HotkeyRecorder({ keys, platform, t, onChange }: Props) {
     if (!recording) return;
     const seen: string[] = [];
     const held = new Set<string>();
-    const stop = () => { setRecording(false); setLive([]); };
+    const stop = () => { setRecording(false); setLive([]); setHint(null); };
     const down = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (e.code === "Escape") return stop();
       if (e.repeat || !e.code) return;
+      if (!isSupportedKey(e.code)) return setHint("editor.hotkeyUnsupported");
+      setHint(null);
       held.add(e.code);
       if (!seen.includes(e.code)) seen.push(e.code);
       setLive(ordered(seen));
@@ -63,9 +75,16 @@ export function HotkeyRecorder({ keys, platform, t, onChange }: Props) {
       // macOS swallows the keyup of other keys while Cmd is down, so releasing Cmd ends the chord.
       if (e.code.startsWith("Meta")) held.clear(); else held.delete(e.code);
       if (held.size === 0 && seen.length > 0) {
-        emit.current(ordered(seen));
-        stop();
-        btn.current?.focus();
+        const r = finishChord(seen);
+        if (r.ok) {
+          emit.current(r.keys);
+          stop();
+          btn.current?.focus();
+        } else { // modifiers only: explain and keep listening
+          seen.length = 0;
+          setLive([]);
+          setHint("editor.hotkeyNeedsKey");
+        }
       }
     };
     window.addEventListener("keydown", down, true);
@@ -84,6 +103,7 @@ export function HotkeyRecorder({ keys, platform, t, onChange }: Props) {
       <div className="chord" aria-live="polite">
         {shown.length > 0 ? formatChord(shown, platform) : <span className="hint">{t(recording ? "editor.hotkeyPress" : "editor.hotkeyNone")}</span>}
       </div>
+      <div className="note hotkey-hint" role="status">{recording && hint ? t(hint) : ""}</div>
       <button ref={btn} type="button" className={recording ? "btn small recording" : "btn small"}
         onClick={() => setRecording((r) => !r)} onBlur={() => setRecording(false)}>
         <Icon name="record" size={16} />

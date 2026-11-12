@@ -29,7 +29,8 @@ const ARROWS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRigh
 export function Grid(p: GridProps) {
   const { cols, rows, t } = p;
   const root = useRef<HTMLDivElement>(null);
-  const [cursor, setCursor] = useState(0);
+  const [rawCursor, setCursor] = useState(0);
+  const cursor = Math.min(rawCursor, cols * rows - 1); // the grid may shrink; some slot must stay tabbable
   const [menu, setMenu] = useState<{ slot: number; rect: DOMRect } | null>(null);
   const byslot = new Map(p.page.buttons.map((b) => [b.slot, b]));
   const focusSlot = (slot: number) => {

@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
 import type { Button, ObsState, VolumeOp } from "../../shared/types";
+import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
 import { Icon } from "./Icons";
 
@@ -150,11 +151,12 @@ export function Inspector(p: InspectorProps) {
   );
 }
 
-/** Arguments are typed as one string and split on whitespace; the local text keeps trailing spaces while typing. */
+/** Shows the formatted arguments (so a restored config is reflected); while focused it keeps the user's raw text. */
 function ArgsInput({ id, args, onChange }: { id: string; args: string[]; onChange(a: string[]): void }) {
-  const [text, setText] = useState(args.join(" "));
+  const [raw, setRaw] = useState<string | null>(null);
   return (
-    <input id={id} className="in" value={text} spellCheck={false}
-      onChange={(e) => { setText(e.target.value); onChange(e.target.value.split(/\s+/).filter(Boolean)); }} />
+    <input id={id} className="in" value={raw ?? formatArgs(args)} spellCheck={false}
+      onFocus={() => setRaw(formatArgs(args))} onBlur={() => setRaw(null)}
+      onChange={(e) => { setRaw(e.target.value); onChange(parseArgs(e.target.value)); }} />
   );
 }

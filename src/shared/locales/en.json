@@ -102,7 +102,7 @@
   "editor.path": "Program",
   "editor.chooseFile": "Browse…",
   "editor.args": "Arguments",
-  "editor.argsHint": "Separate arguments with spaces.",
+  "editor.argsHint": "Separate arguments with spaces. Wrap one in \"double quotes\" if it contains spaces.",
   "editor.hotkeyNone": "No keys yet",
   "editor.hotkeyPress": "Press the keys, then let go…",
   "editor.hotkeyRecord": "Record",
@@ -116,5 +116,9 @@
   "editor.renamePage": "Rename page",
   "editor.deletePage": "Delete page",
   "editor.testOk": "Done",
-  "editor.recovered": "The settings file was damaged and has been reset. The old file was kept as {file}."
+  "editor.recovered": "The settings file was damaged and has been reset. The old file was kept as {file}.",
+  "common.retry": "Retry",
+  "editor.hotkeyUnsupported": "That key is not supported. Try another.",
+  "editor.hotkeyNeedsKey": "Add a key besides Ctrl, Shift, Alt or Win/Cmd.",
+  "editor.slotTaken": "That slot is already taken."
 }

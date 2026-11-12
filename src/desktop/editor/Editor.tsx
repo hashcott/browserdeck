@@ -42,13 +42,19 @@ export function Editor({ onPair }: EditorProps) {
   const tRef = useRef(t);
   tRef.current = t;
 
-  const showError = useCallback((code: unknown) => {
-    const key = `error.${String(code)}`;
-    const text = tRef.current(key) === key ? tRef.current("error.unknown") : tRef.current(key);
+  const showToast = useCallback((text: string) => {
     setToast(text);
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
   }, []);
+  const errorText = (code: unknown) => {
+    const key = `error.${String(code)}`;
+    return t(key) === key ? t("error.unknown") : t(key);
+  };
+  const showError = useCallback((code: unknown) => {
+    const key = `error.${String(code)}`;
+    showToast(tRef.current(key) === key ? tRef.current("error.unknown") : tRef.current(key));
+  }, [showToast]);
 
   // Saves are serialised; a rejected one puts the last accepted config back. Created once the config is loaded.
   const saver = useRef<ReturnType<typeof createSaveQueue<Config>>>();
@@ -67,11 +73,20 @@ export function Editor({ onPair }: EditorProps) {
     await saver.current?.idle();
   }, []);
 
-  // Load, then follow status events.
+  // Subscribe first, then load: an event that lands while getStatus() is in flight wins over its answer.
+  const [loadFailed, setLoadFailed] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
     let unlisten: (() => void) | undefined;
+    const seen = { phone: false, obs: false };
     (async () => {
+      const off = await api.onCoreEvent((e) => {
+        if (e.type === "phone_status") { seen.phone = true; setStatus((s) => ({ ...s, phone_connected: e.connected })); }
+        else if (e.type === "obs_status") { seen.obs = true; setStatus((s) => ({ ...s, obs: e.state })); }
+        else showError(e.error);
+      });
+      if (alive) unlisten = off; else { off(); return; }
       try {
         const [cfg, rt, st] = await Promise.all([api.getConfig(), api.getRuntime(), api.getStatus()]);
         if (!alive) return;
@@ -80,17 +95,19 @@ export function Editor({ onPair }: EditorProps) {
           showError(err);
         }, cfg);
         configRef.current = cfg;
-        setConfig(cfg); setRuntime(rt); setStatus(st); setPageId(cfg.pages[0].id);
-      } catch (e) { showError(e); }
-      const off = await api.onCoreEvent((e) => {
-        if (e.type === "phone_status") setStatus((s) => ({ ...s, phone_connected: e.connected }));
-        else if (e.type === "obs_status") setStatus((s) => ({ ...s, obs: e.state }));
-        else showError(e.error);
-      });
-      if (alive) unlisten = off; else off();
+        setConfig(cfg); setRuntime(rt); setPageId(cfg.pages[0].id); setLoadFailed(null);
+        setStatus((s) => ({ phone_connected: seen.phone ? s.phone_connected : st.phone_connected, obs: seen.obs ? s.obs : st.obs }));
+      } catch (e) { if (alive) setLoadFailed(e); }
     })();
     return () => { alive = false; unlisten?.(); };
-  }, [showError]);
+  }, [showError, attempt]);
+  // Closing or hiding the window must not lose a debounced edit.
+  useEffect(() => {
+    const send = () => { void flush(); };
+    window.addEventListener("pagehide", send);
+    window.addEventListener("beforeunload", send);
+    return () => { window.removeEventListener("pagehide", send); window.removeEventListener("beforeunload", send); };
+  }, [flush]);
   useEffect(() => () => { void flush(); clearTimeout(toastTimer.current); }, [flush]);
 
   const themeId = config?.settings.theme;
@@ -117,6 +134,12 @@ export function Editor({ onPair }: EditorProps) {
     if (!cur || !pg) return;
     commit({ ...cur, pages: cur.pages.map((x) => (x.id === pg.id ? fn(x) : x)) }, slow);
   }, [commit, pageId]);
+  /** Applies `fn` to the button as it is now (not as it was when an async dialog opened); does nothing if it is gone. */
+  const patchButton = (id: string, fn: (b: Button) => Button) => {
+    const cur = configRef.current;
+    if (!cur?.pages.some((pg) => pg.buttons.some((b) => b.id === id))) return;
+    commit({ ...cur, pages: cur.pages.map((pg) => (pg.buttons.some((b) => b.id === id) ? updateButton(pg, fn(pg.buttons.find((b) => b.id === id)!)) : pg)) });
+  };
   const focusOn = (slot: number) => setFocusReq((r) => ({ slot, tick: (r?.tick ?? 0) + 1 }));
 
   const on: EditorHandlers = {
@@ -147,11 +170,19 @@ export function Editor({ onPair }: EditorProps) {
     },
     select: (id) => { setSelectedId(id); setConfirm(null); },
     createAt: (slot, type: ActionType) => {
+      const cur = configRef.current?.pages.find((x) => x.id === pageId) ?? configRef.current?.pages[0];
+      if (cur?.buttons.some((x) => x.slot === slot)) { showToast(t("editor.slotTaken")); return; }
       const b = newButton(crypto.randomUUID(), slot, defaultAction(type));
       withPage((pg) => placeNew(pg, slot, b));
       setSelectedId(b.id); setConfirm(null); focusOn(slot);
     },
-    moveTo: (id, slot) => { withPage((pg) => moveButton(pg, id, slot)); setSelectedId(id); focusOn(slot); },
+    moveTo: (id, slot) => {
+      const cur = configRef.current?.pages.find((x) => x.id === pageId) ?? configRef.current?.pages[0];
+      const b = cur?.buttons.find((x) => x.id === id);
+      if (!b || b.slot === slot) return; // unchanged page: nothing to save or select
+      withPage((pg) => moveButton(pg, id, slot));
+      setSelectedId(id); focusOn(slot);
+    },
     askDeleteButton: (id) => { setSelectedId(id); setConfirm({ kind: "button", id }); },
     deleteButton: (id) => {
       const slot = page?.buttons.find((b) => b.id === id)?.slot;
@@ -173,28 +204,36 @@ export function Editor({ onPair }: EditorProps) {
       } finally { setTesting(false); }
     },
     pickImage: async () => {
-      const b = page?.buttons.find((x) => x.id === selectedId);
-      if (!b) return;
+      const id = selectedId;
+      if (!id) return;
       try {
         const path = await open({ multiple: false, filters: [{ name: t("editor.iconImage"), extensions: IMAGE_EXT }] });
         if (typeof path !== "string") return;
         const file = await api.importIcon(path);
-        withPage((pg) => updateButton(pg, { ...b, icon: { kind: "image", file } }));
+        patchButton(id, (b) => ({ ...b, icon: { kind: "image", file } }));
       } catch (e) { showError(e); }
     },
     pickFile: async () => {
-      const b = page?.buttons.find((x) => x.id === selectedId);
-      if (!b || b.action.type !== "launch") return;
+      const id = selectedId;
+      if (!id) return;
       try {
         const path = await open({ multiple: false });
         if (typeof path !== "string") return;
-        withPage((pg) => updateButton(pg, { ...b, action: { ...(b.action as Extract<Button["action"], { type: "launch" }>), path } }));
+        patchButton(id, (b) => (b.action.type === "launch" ? { ...b, action: { ...b.action, path } } : b));
       } catch (e) { showError(e); }
     },
     dismissNotice: (id) => setDismissed((d) => new Set(d).add(id)),
     pair: onPair,
   };
 
+  if (loadFailed) {
+    return (
+      <div className="loading" role="alert">
+        <p>{errorText(loadFailed)}</p>
+        <button type="button" className="btn cta" onClick={() => setAttempt((n) => n + 1)}>{t("common.retry")}</button>
+      </div>
+    );
+  }
   if (!config || !theme || !runtime || !page) return <p className="loading" role="status">{toast ?? t("common.loading")}</p>;
 
   const notices: Notice[] = [];
