@@ -14,6 +14,8 @@ pub enum ObsState {
     Connected,
     Disconnected,
     AuthFailed,
+    /// OBS or obs-websocket is older than the `obws` crate supports.
+    Unsupported,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]

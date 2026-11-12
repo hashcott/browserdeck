@@ -36,6 +36,7 @@ export interface EditorHandlers {
   pickFile(): void;
   dismissNotice(id: string): void;
   pair(): void;
+  settings(): void;
 }
 export interface EditorViewProps {
   config: Config;
@@ -126,7 +127,7 @@ export function EditorView(p: EditorViewProps) {
   };
   const overlayButton = active?.startsWith("key:") ? page.buttons.find((b) => `key:${b.id}` === active) : undefined;
 
-  const obsText = { connected: "status.obsConnected", disconnected: "status.obsDisconnected", auth_failed: "status.obsAuthFailed" } satisfies Record<ObsState, string>;
+  const obsText = { connected: "status.obsConnected", disconnected: "status.obsDisconnected", auth_failed: "status.obsAuthFailed", unsupported: "status.obsUnsupported" } satisfies Record<ObsState, string>;
 
   return (
     <DndContext sensors={sensors} collisionDetection={collision} accessibility={{ announcements, screenReaderInstructions: { draggable: t("editor.dragHelp") } }}
@@ -142,6 +143,7 @@ export function EditorView(p: EditorViewProps) {
             <span><StatusDot on={p.status.obs === "connected"} />{t(obsText[p.status.obs])}</span>
           </div>
           <button type="button" className="btn cta bar-cta" onClick={on.pair}><Icon name="phone" size={18} />{t("pairing.title")}</button>
+          <button type="button" className="bar-icon" aria-label={t("settings.title")} title={t("settings.title")} onClick={on.settings}><Icon name="sliders" size={22} /></button>
         </header>
 
         {p.notices.length > 0 && (

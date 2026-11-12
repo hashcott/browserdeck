@@ -125,7 +125,7 @@ export type ServerMsg =
 export type ClientMsg = { type: "press"; press_id: number; button_id: string };
 
 // Desktop events and command results (state.rs, commands.rs)
-export type ObsState = "connected" | "disconnected" | "auth_failed";
+export type ObsState = "connected" | "disconnected" | "auth_failed" | "unsupported";
 export type CoreEvent =
   | { type: "phone_status"; connected: boolean }
   | { type: "obs_status"; state: ObsState }

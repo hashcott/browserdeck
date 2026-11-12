@@ -17,6 +17,8 @@ const PATHS = {
   record: <circle cx="12" cy="12" r="5" />,
   play: <path d="M8 5v14l11-7z" />,
   grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" />,
+  sliders: <><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+  back: <path d="M19 12H5M11 6l-6 6 6 6" />,
   alert: <path d="M12 4 3 20h18zM12 10v4M12 17h.01" />,
 } satisfies Record<string, ReactNode>;
 

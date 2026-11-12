@@ -146,6 +146,11 @@ fn is_auth_failure(e: &obws::error::Error) -> bool {
     )
 }
 
+/// `obws` refuses OBS Studio < 30.2 and obs-websocket outside ^5.5 right after the handshake.
+fn is_unsupported_version(e: &obws::error::Error) -> bool {
+    matches!(e, obws::error::Error::ObsStudioVersion(..) | obws::error::Error::ObsWebsocketVersion(..))
+}
+
 /// Connects, then watches the connection; reconnects every `interval`. Never returns: the caller
 /// cancels it when the settings change.
 async fn session(shared: &Shared, s: &ObsSettings, interval: Duration) {
@@ -177,6 +182,8 @@ async fn session(shared: &Shared, s: &ObsSettings, interval: Duration) {
                 shared.set_state(ObsState::AuthFailed);
                 std::future::pending::<()>().await; // wait for new settings
             }
+            // Keep retrying at the normal interval: the user may upgrade OBS.
+            Ok(Err(e)) if is_unsupported_version(&e) => shared.set_state(ObsState::Unsupported),
             _ => shared.set_state(ObsState::Disconnected),
         }
         tokio::time::sleep(interval).await;
@@ -345,6 +352,17 @@ mod tests {
         assert_eq!(map_error(&api(StatusCode::RequestProcessingFailed)), ActionError::ObsRequestFailed);
         assert_eq!(map_error(&Error::Disconnected), ActionError::ObsNotConnected);
         assert_eq!(map_error(&Error::Timeout), ActionError::ObsNotConnected);
+    }
+
+    #[test]
+    fn version_mismatch_errors_are_unsupported_others_are_not() {
+        use obws::error::Error;
+        let req = semver::Comparator { op: semver::Op::GreaterEq, major: 30, minor: Some(2), patch: None, pre: semver::Prerelease::EMPTY };
+        let old = semver::Version::new(29, 0, 0);
+        assert!(is_unsupported_version(&Error::ObsStudioVersion(old.clone(), req.clone())));
+        assert!(is_unsupported_version(&Error::ObsWebsocketVersion(old, req)));
+        assert!(!is_unsupported_version(&Error::Disconnected));
+        assert!(!is_unsupported_version(&Error::Timeout));
     }
 
     /// Needs a real OBS with the WebSocket server on and two scenes:

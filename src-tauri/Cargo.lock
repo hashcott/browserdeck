@@ -404,6 +404,7 @@ dependencies = [
  "obws",
  "rand 0.8.8",
  "rust-embed",
+ "semver",
  "serde",
  "serde_json",
  "subtle",

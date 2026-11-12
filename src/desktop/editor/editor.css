@@ -1,25 +1,27 @@
 /* Desktop editor. The shell (bar, side columns) is the keycap colourway and never changes with the button theme;
    only .center takes the active theme, through the custom properties themeVars() sets on it. */
 html, body, #root { margin: 0; height: 100%; overflow: hidden; }
-.editor {
+.editor, .screen {
   --bg: #e8e5dd; --ink: #22252b; --bar: #2c3a55; --barink: #f6f1e4; --side: #dedad0; --panel: #f6f1e4;
   --cream: #f6f1e4; --navy: #2c3a55; --olive: #6f7d4f; --orange: #e8703a;
   --mute: #5b5a52; --danger: #a3341a; --field: #fffdf6; --line: #c9c3b3; --ok: #3f5a1f;
   --r: 10px; --r2: 8px;
   box-sizing: border-box;
   height: 100vh;
-  display: grid;
-  grid-template-rows: 64px auto minmax(0, 1fr);
-  grid-template-columns: clamp(220px, 18vw, 260px) minmax(0, 1fr) clamp(290px, 24vw, 340px);
   background: var(--bg);
   color: var(--ink);
   font: 500 15px/1.4 "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-.editor *, .editor *::before, .editor *::after { box-sizing: border-box; }
-.editor button, .editor input, .editor select { font: inherit; color: inherit; }
-.editor button { cursor: pointer; }
-.editor button:disabled { cursor: default; }
-.editor :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.editor {
+  display: grid;
+  grid-template-rows: 64px auto minmax(0, 1fr);
+  grid-template-columns: clamp(220px, 18vw, 260px) minmax(0, 1fr) clamp(290px, 24vw, 340px);
+}
+.editor *, .editor *::before, .editor *::after, .screen *, .screen *::before, .screen *::after { box-sizing: border-box; }
+.editor button, .editor input, .editor select, .screen button, .screen input, .screen select { font: inherit; color: inherit; }
+.editor button, .screen button { cursor: pointer; }
+.editor button:disabled, .screen button:disabled { cursor: default; }
+.editor :focus-visible, .screen :focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 .bar :focus-visible, .toast :focus-visible { outline-color: var(--cream); }
 .loading { margin: 24px; font-weight: 700; }
 .loading p { margin: 0 0 16px; }
@@ -44,6 +46,8 @@ html, body, #root { margin: 0; height: 100%; overflow: hidden; }
 .dot { flex: none; color: var(--orange); }
 .dot.on { color: #a9c47a; }
 .bar-cta { flex: none; }
+.bar-icon { all: unset; box-sizing: border-box; flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin-left: -8px; border-radius: var(--r2); cursor: pointer; color: var(--barink); }
+.bar-icon:hover { background: #ffffff1f; }
 
 /* buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border-radius: var(--r2); border: 1.5px solid var(--line); background: var(--field); font-weight: 700; line-height: 1.1; white-space: nowrap; }
@@ -146,4 +150,4 @@ select.in { appearance: auto; }
 .result .ok { color: var(--ok); }
 .result .bad { color: var(--danger); }
 
-@media (prefers-reduced-motion: reduce) { .editor * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .editor *, .screen * { transition: none !important; } }
