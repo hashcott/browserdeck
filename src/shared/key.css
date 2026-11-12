@@ -4,7 +4,7 @@
    lives on the inner .key-cap, so it scales with the key's own width. */
 .key-face {
   --ring: 0px; --lip: 0px; --drop: 0px;
-  font-family: Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   container-type: inline-size;
   position: relative;
   width: 100%;

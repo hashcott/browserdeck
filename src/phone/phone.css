@@ -1,0 +1,71 @@
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #22252b; }
+body { -webkit-text-size-adjust: 100%; }
+
+.phone {
+  box-sizing: border-box;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--ground, #22252b);
+  color: var(--ink, #f6f1e4);
+  font-family: "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-weight: 500;
+}
+
+/* Inverted ink-on-ground pair, so the text always contrasts with whatever theme is active. */
+.strip, .toast span {
+  background: var(--ink, #f6f1e4);
+  color: var(--ground, #22252b);
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.strip { flex: none; padding: 10px 16px; text-align: center; }
+.toast { flex: none; min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 12px; }
+.toast span { padding: 6px 12px; border-radius: 10px; text-align: center; max-width: 36em; }
+
+.stage { flex: 1; min-height: 0; min-width: 0; container-type: size; }
+.pager {
+  display: flex; width: 100%; height: 100%;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; touch-action: pan-x; scrollbar-width: none;
+}
+.pager::-webkit-scrollbar { display: none; }
+.slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; }
+
+/* Square keys: the grid is as large as fits both ways, centred. */
+.deck-grid {
+  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows)));
+  aspect-ratio: var(--cols) / var(--rows);
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+}
+/* The button is the whole cell (the tap target); the gap lives in its padding. */
+.key-btn {
+  all: unset;
+  box-sizing: border-box;
+  padding: calc(var(--key-gap, 9%) / 2);
+  min-width: 0; min-height: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+}
+.key-btn:disabled { cursor: default; }
+.key-btn:focus-visible { outline: 3px solid var(--key-ring, #fff); outline-offset: -3px; border-radius: 12px; }
+
+.empty { margin: 0; height: 100%; display: grid; place-items: center; padding: 0 32px; text-align: center; font-size: 18px; font-weight: 700; line-height: 1.35; text-wrap: balance; }
+
+.dots { flex: none; display: flex; justify-content: center; }
+.dot { all: unset; box-sizing: border-box; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dot::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink, #f6f1e4); box-sizing: border-box; }
+.dot[aria-current="true"]::before { background: var(--ink, #f6f1e4); width: 14px; height: 14px; }
+.dot:focus-visible { outline: 3px solid var(--ink, #f6f1e4); outline-offset: -6px; border-radius: 12px; }
+
+.kicked { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 0 32px; text-align: center; font-size: 22px; font-weight: 800; line-height: 1.3; text-wrap: balance; }
+.kicked p { margin: 0; max-width: 18em; }
+.reload { all: unset; box-sizing: border-box; min-height: 52px; padding: 0 28px; display: grid; place-items: center; border-radius: 14px; background: var(--ink, #f6f1e4); color: var(--ground, #22252b); font-size: 18px; font-weight: 800; cursor: pointer; }
+.reload:focus-visible { outline: 3px solid var(--ink, #f6f1e4); outline-offset: 3px; }
