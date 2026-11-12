@@ -195,6 +195,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn empty_configured_token_never_authenticates() {
+        let (_, d) = app();
+        let state = Arc::new(AppState {
+            data_dir: d.path().to_path_buf(),
+            config: tokio::sync::RwLock::new(Config::default_with_token(String::new())),
+            port: AtomicU16::new(0),
+            hub: Hub::new(),
+            executor: Arc::new(OkExec),
+            events: Arc::new(NullSink),
+        });
+        let app = router(state);
+        assert_eq!(get(&app, "/?token=", None).await.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(get(&app, "/", Some("sd_token=")).await.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
     async fn right_query_token_redirects_and_sets_cookie() {
         let (app, _d) = app();
         let r = get(&app, "/?token=secret", None).await;

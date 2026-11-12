@@ -9,8 +9,9 @@ pub fn new_token() -> String {
 }
 
 /// Constant-time compare; differing lengths return false immediately (length is not secret).
+/// An empty `expected` never matches, so a blank configured token cannot fail open.
 pub fn verify(expected: &str, given: &str) -> bool {
-    expected.as_bytes().ct_eq(given.as_bytes()).into()
+    !expected.is_empty() && expected.as_bytes().ct_eq(given.as_bytes()).into()
 }
 
 #[cfg(test)]
@@ -31,5 +32,6 @@ mod tests {
         assert!(!verify("abc", "abd"));
         assert!(!verify("abc", "ab"));
         assert!(!verify("abc", ""));
+        assert!(!verify("", ""));
     }
 }
