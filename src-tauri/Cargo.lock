@@ -260,6 +260,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "browserdeck"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "futures-util",
+ "http-body-util",
+ "rand 0.8.8",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "subtle",
+ "tauri",
+ "tauri-build",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite 0.26.2",
+ "tower",
+ "windows",
+]
+
+[[package]]
 name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3309,28 +3331,6 @@ name = "static_vcruntime"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff7589a1859b09232522bb9edf076ca7fcf14ded96685d3fa629db73023ffbb7"
-
-[[package]]
-name = "stream-deck"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "futures-util",
- "http-body-util",
- "rand 0.8.8",
- "rust-embed",
- "serde",
- "serde_json",
- "subtle",
- "tauri",
- "tauri-build",
- "tempfile",
- "tokio",
- "tokio-tungstenite 0.26.2",
- "tower",
- "windows",
-]
 
 [[package]]
 name = "string_cache"
