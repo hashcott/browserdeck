@@ -3,5 +3,8 @@ node_modules/
 dist/
 src-tauri/target/
 src-tauri/gen/
-.impeccable/mocks/decision/*
-!.impeccable/mocks/decision/pick-keycap.html
+
+# internal planning and design notes, kept local
+PRODUCT.md
+docs/superpowers/
+.impeccable/
