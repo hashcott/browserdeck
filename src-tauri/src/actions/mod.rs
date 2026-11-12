@@ -14,6 +14,7 @@ pub enum ActionError {
     ObsNotConnected,
     ObsSceneMissing,
     UnsupportedPlatform,
+    Timeout,
 }
 
 #[async_trait::async_trait]
@@ -21,12 +22,16 @@ pub trait Executor: Send + Sync {
     async fn run(&self, action: &Action) -> Result<(), ActionError>;
 }
 
+pub const PRESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Looks the button up in the current config and runs its stored action.
 pub async fn press(state: &AppState, button_id: &str) -> Result<(), ActionError> {
     // Clone and release the lock so a slow action never blocks config access.
     let action = state.config.read().await.find_button(button_id).map(|b| b.action.clone());
     let result = match action {
-        Some(a) => state.executor.run(&a).await,
+        Some(a) => tokio::time::timeout(PRESS_TIMEOUT, state.executor.run(&a))
+            .await
+            .unwrap_or(Err(ActionError::Timeout)),
         None => Err(ActionError::UnknownButton),
     };
     if let Err(error) = result {
@@ -70,18 +75,39 @@ pub(crate) mod testing {
         pub _dir: tempfile::TempDir,
     }
 
-    pub fn fixture(result: Result<(), ActionError>) -> Fixture {
+    pub struct Hangs;
+    #[async_trait::async_trait]
+    impl Executor for Hangs {
+        async fn run(&self, _: &Action) -> Result<(), ActionError> {
+            std::future::pending().await
+        }
+    }
+
+    pub struct Panics;
+    #[async_trait::async_trait]
+    impl Executor for Panics {
+        async fn run(&self, _: &Action) -> Result<(), ActionError> {
+            panic!("executor panicked (expected in test)")
+        }
+    }
+
+    pub fn state_with(exec: Arc<dyn Executor>, sink: Arc<RecordingSink>) -> (Arc<AppState>, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let exec = Arc::new(RecordingExecutor { ran: Mutex::new(vec![]), result });
-        let sink = Arc::new(RecordingSink::default());
         let state = Arc::new(AppState {
             data_dir: dir.path().to_path_buf(),
             config: tokio::sync::RwLock::new(Config::default_with_token("secret".into())),
             port: AtomicU16::new(0),
-            hub: Hub::new(),
-            executor: exec.clone(),
-            events: sink.clone(),
+            hub: Hub::new(sink.clone()),
+            executor: exec,
+            events: sink,
         });
+        (state, dir)
+    }
+
+    pub fn fixture(result: Result<(), ActionError>) -> Fixture {
+        let exec = Arc::new(RecordingExecutor { ran: Mutex::new(vec![]), result });
+        let sink = Arc::new(RecordingSink::default());
+        let (state, dir) = state_with(exec.clone(), sink.clone());
         Fixture { state, exec, sink, _dir: dir }
     }
 }
@@ -91,6 +117,7 @@ mod tests {
     use super::testing::fixture;
     use super::*;
     use crate::config::VolumeOp;
+    use std::sync::Arc;
 
     async fn first_button_id(f: &testing::Fixture) -> String {
         f.state.config.read().await.pages[0].buttons[1].id.clone()
@@ -119,6 +146,18 @@ mod tests {
         assert_eq!(
             *f.sink.0.lock().unwrap(),
             vec![CoreEvent::ActionFailed { button_id: id, error: ActionError::FileNotFound }]
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn hanging_executor_times_out() {
+        let sink = Arc::new(testing::RecordingSink::default());
+        let (state, _d) = testing::state_with(Arc::new(testing::Hangs), sink.clone());
+        let id = state.config.read().await.pages[0].buttons[0].id.clone();
+        assert_eq!(press(&state, &id).await, Err(ActionError::Timeout));
+        assert_eq!(
+            *sink.0.lock().unwrap(),
+            vec![CoreEvent::ActionFailed { button_id: id, error: ActionError::Timeout }]
         );
     }
 }

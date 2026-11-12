@@ -2,8 +2,9 @@ use crate::actions;
 use crate::auth;
 use crate::config::is_icon_file_name;
 use crate::hub::{layout_msg, ClientMsg, ServerMsg};
-use crate::state::{AppState, CoreEvent};
+use crate::state::{AppState};
 use axum::{
+    body::Bytes,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path, Request, State,
@@ -17,7 +18,9 @@ use axum::{
 use rust_embed::RustEmbed;
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
+use tokio::time::Instant;
 
 pub const DEFAULT_PORT: u16 = 47821;
 
@@ -131,6 +134,8 @@ async fn icon(State(state): State<Arc<AppState>>, Path(file): Path<String>) -> R
 }
 
 const MAX_WS_MESSAGE: usize = 4096;
+const PING_INTERVAL: Duration = Duration::from_secs(15);
+const IDLE_TIMEOUT: Duration = Duration::from_secs(45);
 
 async fn ws_upgrade(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) -> Response {
     ws.max_message_size(MAX_WS_MESSAGE).on_upgrade(move |socket| phone_session(state, socket))
@@ -141,20 +146,47 @@ async fn send_msg(socket: &mut WebSocket, msg: &ServerMsg) -> bool {
     socket.send(Message::Text(json.into())).await.is_ok()
 }
 
+/// Detaches on every exit path (return, panic, task dropped at shutdown).
+struct Attached(Arc<AppState>, u64);
+impl Drop for Attached {
+    fn drop(&mut self) {
+        self.0.hub.detach_now(self.1);
+    }
+}
+
 async fn phone_session(state: Arc<AppState>, mut socket: WebSocket) {
     let (conn_id, mut rx) = state.hub.attach().await;
-    state.events.emit(CoreEvent::PhoneStatus { connected: true });
-    if send_msg(&mut socket, &layout_msg(&state).await).await {
-        loop {
-            tokio::select! {
-                out = rx.recv() => match out {
-                    Some(msg) => {
-                        let kicked = msg == ServerMsg::Kicked;
-                        if !send_msg(&mut socket, &msg).await || kicked { break }
+    let _attached = Attached(state.clone(), conn_id);
+    if !send_msg(&mut socket, &layout_msg(&state).await).await {
+        return;
+    }
+    let mut ping = tokio::time::interval_at(Instant::now() + PING_INTERVAL, PING_INTERVAL);
+    let mut last_rx = Instant::now();
+    loop {
+        // Biased: a pending Kicked is always handled before another press.
+        tokio::select! {
+            biased;
+            out = rx.recv() => match out {
+                Some(msg) => {
+                    let kicked = msg == ServerMsg::Kicked;
+                    if !send_msg(&mut socket, &msg).await { break }
+                    if kicked {
+                        let _ = socket.send(Message::Close(None)).await;
+                        break;
                     }
-                    None => break,
-                },
-                inc = socket.recv() => match inc {
+                }
+                None => break,
+            },
+            _ = ping.tick() => {
+                if last_rx.elapsed() >= IDLE_TIMEOUT
+                    || socket.send(Message::Ping(Bytes::new())).await.is_err()
+                {
+                    break;
+                }
+            }
+            inc = socket.recv() => {
+                last_rx = Instant::now();
+                match inc {
                     Some(Ok(Message::Text(t))) => {
                         // Garbage (or any type other than `press`) is ignored, connection stays open.
                         let Ok(ClientMsg::Press { press_id, button_id }) = serde_json::from_str(&t) else { continue };
@@ -164,14 +196,9 @@ async fn phone_session(state: Arc<AppState>, mut socket: WebSocket) {
                     }
                     Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
                     Some(Ok(_)) => {}
-                },
+                }
             }
         }
-    }
-    state.hub.detach(conn_id).await;
-    // A kicked old connection closing must not report "disconnected" while a new phone is attached.
-    if !state.hub.connected().await {
-        state.events.emit(CoreEvent::PhoneStatus { connected: false });
     }
 }
 
@@ -208,7 +235,7 @@ mod tests {
             data_dir: dir.path().to_path_buf(),
             config: tokio::sync::RwLock::new(Config::default_with_token("secret".into())),
             port: AtomicU16::new(0),
-            hub: Hub::new(),
+            hub: Hub::new(Arc::new(NullSink)),
             executor: Arc::new(OkExec),
             events: Arc::new(NullSink),
         });
@@ -252,7 +279,7 @@ mod tests {
             data_dir: d.path().to_path_buf(),
             config: tokio::sync::RwLock::new(Config::default_with_token(String::new())),
             port: AtomicU16::new(0),
-            hub: Hub::new(),
+            hub: Hub::new(Arc::new(NullSink)),
             executor: Arc::new(OkExec),
             events: Arc::new(NullSink),
         });
@@ -316,17 +343,17 @@ mod tests {
 
     mod ws {
         use super::*;
-        use crate::actions::testing::{fixture, Fixture};
+        use crate::actions::testing::{fixture, state_with, Fixture, Hangs, Panics, RecordingSink};
         use futures_util::{SinkExt, StreamExt};
         use serde_json::{json, Value};
         use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message as M};
 
         type Client = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-        async fn serve(f: &Fixture) -> u16 {
+        async fn serve(state: &Arc<AppState>) -> u16 {
             let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let port = l.local_addr().unwrap().port();
-            let app = router(f.state.clone());
+            let app = router(state.clone());
             tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
             port
         }
@@ -349,7 +376,7 @@ mod tests {
         }
 
         async fn paired(f: &Fixture) -> Client {
-            let mut c = connect(serve(f).await, OK).await.unwrap();
+            let mut c = connect(serve(&f.state).await, OK).await.unwrap();
             assert_eq!(next_json(&mut c).await["type"], "layout");
             c
         }
@@ -357,7 +384,7 @@ mod tests {
         #[tokio::test]
         async fn ws_without_token_is_rejected() {
             let f = fixture(Ok(()));
-            let port = serve(&f).await;
+            let port = serve(&f.state).await;
             match connect(port, None).await {
                 Err(tokio_tungstenite::tungstenite::Error::Http(r)) => assert_eq!(r.status(), 401),
                 other => panic!("expected 401, got {:?}", other.map(|_| ())),
@@ -367,7 +394,7 @@ mod tests {
         #[tokio::test]
         async fn ws_sends_layout_first() {
             let f = fixture(Ok(()));
-            let mut c = connect(serve(&f).await, OK).await.unwrap();
+            let mut c = connect(serve(&f.state).await, OK).await.unwrap();
             let m = next_json(&mut c).await;
             assert_eq!(m["type"], "layout");
             assert_eq!(m["pages"].as_array().unwrap().len(), 1);
@@ -411,7 +438,16 @@ mod tests {
             let id = f.state.config.read().await.pages[0].buttons[0].id.clone();
             let big = json!({"type":"press","press_id":1,"button_id":id,"pad":"x".repeat(5000)}).to_string();
             c.send(M::text(big)).await.unwrap();
-            let _ = tokio::time::timeout(std::time::Duration::from_millis(500), c.next()).await;
+            let ended = tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    match c.next().await {
+                        None | Some(Err(_)) | Some(Ok(M::Close(_))) => break,
+                        _ => {}
+                    }
+                }
+            })
+            .await;
+            assert!(ended.is_ok(), "connection should end");
             assert!(f.exec.ran.lock().unwrap().is_empty());
         }
 
@@ -426,20 +462,65 @@ mod tests {
             assert_eq!(f.exec.ran.lock().unwrap().len(), 1); // only the real press
         }
 
+        async fn eventually(limit: Duration, mut ok: impl FnMut() -> bool) {
+            let end = Instant::now() + limit;
+            while !ok() {
+                assert!(Instant::now() < end, "condition not reached in time");
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }
+
+        const UP: CoreEvent = CoreEvent::PhoneStatus { connected: true };
+        const DOWN: CoreEvent = CoreEvent::PhoneStatus { connected: false };
+
         #[tokio::test]
         async fn ws_phone_status_follows_current_connection() {
             let f = fixture(Ok(()));
-            let port = serve(&f).await;
+            let port = serve(&f.state).await;
             let mut a = connect(port, OK).await.unwrap();
             next_json(&mut a).await;
             let mut b = connect(port, OK).await.unwrap();
             next_json(&mut b).await;
             assert_eq!(next_json(&mut a).await["type"], "kicked");
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            assert!(f.sink.0.lock().unwrap().iter().all(|e| *e != CoreEvent::PhoneStatus { connected: false }));
+            assert!(matches!(a.next().await, Some(Ok(M::Close(_)))), "close frame after kicked");
             b.close(None).await.unwrap();
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-            assert_eq!(f.sink.0.lock().unwrap().last(), Some(&CoreEvent::PhoneStatus { connected: false }));
+            eventually(Duration::from_secs(5), || *f.sink.0.lock().unwrap() == [UP, UP, DOWN]).await;
+        }
+
+        #[tokio::test]
+        async fn ws_press_after_kick_does_not_run() {
+            let f = fixture(Ok(()));
+            let port = serve(&f.state).await;
+            let mut a = connect(port, OK).await.unwrap();
+            next_json(&mut a).await;
+            let mut b = connect(port, OK).await.unwrap();
+            next_json(&mut b).await;
+            assert_eq!(next_json(&mut a).await["type"], "kicked");
+            let id = f.state.config.read().await.pages[0].buttons[0].id.clone();
+            let _ = a.send(M::text(json!({"type":"press","press_id":1,"button_id":id}).to_string())).await;
+            let _ = tokio::time::timeout(Duration::from_millis(300), a.next()).await;
+            assert!(f.exec.ran.lock().unwrap().is_empty());
+        }
+
+        #[tokio::test]
+        async fn ws_executor_panic_still_detaches() {
+            let sink = Arc::new(RecordingSink::default());
+            let (state, _d) = state_with(Arc::new(Panics), sink.clone());
+            let mut c = connect(serve(&state).await, OK).await.unwrap();
+            next_json(&mut c).await;
+            let id = state.config.read().await.pages[0].buttons[0].id.clone();
+            c.send(M::text(json!({"type":"press","press_id":1,"button_id":id}).to_string())).await.unwrap();
+            eventually(Duration::from_secs(5), || *sink.0.lock().unwrap() == [UP, DOWN]).await;
+            assert!(!state.hub.connected().await);
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn ws_unresponsive_client_is_detached() {
+            let sink = Arc::new(RecordingSink::default());
+            let (state, _d) = state_with(Arc::new(Hangs), sink.clone());
+            let _silent = connect(serve(&state).await, OK).await.unwrap(); // never polled again: no pongs
+            eventually(Duration::from_secs(300), || *sink.0.lock().unwrap() == [UP, DOWN]).await;
+            assert!(!state.hub.connected().await);
         }
     }
 }
