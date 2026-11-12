@@ -1,0 +1,80 @@
+/* One button face. Theme values arrive only as custom properties (see themeVars);
+   look variants are picked by fixed class names. Never rotated. */
+.key-face {
+  --ring: 0px; --lip: 0px; --drop: 0px;
+  font-family: Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  container-type: inline-size;
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 11cqw;
+  overflow: hidden;
+  border-radius: var(--key-radius);
+  border: var(--key-border);
+  background: var(--key-bg);
+  color: var(--key-ink);
+  box-shadow:
+    inset 0 0 0 var(--ring) #ffffff22,
+    inset 0 calc(var(--lip) * -1) 0 #00000014,
+    0 var(--drop) 10px -4px #22252b55;
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 90ms ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.key-icon { font-size: max(22px, 30cqw); line-height: 1; flex: none; width: max-content; max-width: 100%; }
+img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; object-fit: contain; }
+.key-label {
+  font-weight: 800;
+  font-size: max(12px, 12cqw);
+  line-height: 1.15;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* legend */
+.legend-center { align-items: center; justify-content: center; gap: 6cqw; text-align: center; }
+.legend-top_left { align-items: flex-start; justify-content: space-between; text-align: left; }
+.legend-bottom_left { align-items: flex-start; justify-content: flex-end; gap: 6cqw; text-align: left; }
+
+/* depth */
+.depth-flat { --ring: 0px; }
+.depth-dish { --ring: 5cqw; --lip: 5cqw; --drop: 6px; }
+.depth-raised { --lip: 7cqw; --drop: 5px; box-shadow: inset 0 2px 0 #ffffff44, inset 0 calc(var(--lip) * -1) 0 #00000026, 0 var(--drop) 8px -3px #0008; }
+.depth-sticker { --ring: 2cqw; --drop: 3px; }
+
+/* press: pure CSS on a class, no transition so it shows at once */
+.is-pressed { transition: none; }
+.press-sink.is-pressed { transform: translateY(4px); --lip: 1.5cqw; --drop: 1px; }
+.press-dim.is-pressed { filter: brightness(0.7); }
+.press-lift.is-pressed { transform: translateY(-3px) scale(1.04); --drop: 10px; }
+
+/* selected: 4px outline in the theme ink; siblings fade (the grid opts in with .deck-grid) */
+.key-face.is-selected { outline: 4px solid var(--ink); outline-offset: 3px; }
+.deck-grid:has(.key-face.is-selected) .key-face:not(.is-selected) { opacity: 0.55; }
+
+/* error and disabled carry a non-colour cue: a "!" badge, and a hatch over the face */
+.key-face.is-error::after {
+  content: "!";
+  position: absolute; top: 6cqw; right: 6cqw;
+  width: 20cqw; height: 20cqw; min-width: 18px; min-height: 18px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--key-ink); color: var(--key-bg);
+  font-weight: 800; font-size: max(13px, 14cqw); line-height: 1;
+}
+.key-face.is-disabled { filter: grayscale(0.7); opacity: 0.6; }
+.key-face.is-disabled::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, #00000033 6px 8px);
+}
+
+@media (prefers-reduced-motion: reduce) { .key-face { transition: none; } }
