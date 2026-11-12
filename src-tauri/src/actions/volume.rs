@@ -38,8 +38,16 @@ fn windows_volume(op: VolumeOp) -> windows::core::Result<()> {
     match op {
         // SAFETY: `endpoint` is a live interface and a null event-context GUID is allowed.
         VolumeOp::Mute => unsafe { endpoint.SetMute(!endpoint.GetMute()?.as_bool(), no_context) },
-        // SAFETY: as above.
-        _ => unsafe { endpoint.SetMasterVolumeLevelScalar(stepped(endpoint.GetMasterVolumeLevelScalar()?, op), no_context) },
+        _ => {
+            // SAFETY: as above.
+            unsafe { endpoint.SetMasterVolumeLevelScalar(stepped(endpoint.GetMasterVolumeLevelScalar()?, op), no_context) }?;
+            if op == VolumeOp::Up {
+                // Like the keyboard's volume-up key, raising the volume also unmutes.
+                // SAFETY: as above.
+                unsafe { endpoint.SetMute(false, no_context) }?;
+            }
+            Ok(())
+        }
     }
 }
 
@@ -51,7 +59,8 @@ pub fn volume(op: VolumeOp) -> Result<(), ActionError> {
         _ => {
             // "missing value" (device without volume control) fails to parse, which is the right error.
             let now: f32 = osascript("output volume of (get volume settings)")?.parse().map_err(|_| ActionError::VolumeFailed)?;
-            format!("set volume output volume {}", (stepped(now / 100.0, op) * 100.0).round() as u8)
+            let unmute = if op == VolumeOp::Up { " without output muted" } else { "" };
+            format!("set volume output volume {}{unmute}", (stepped(now / 100.0, op) * 100.0).round() as u8)
         }
     };
     osascript(&script).map(drop)
