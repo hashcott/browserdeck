@@ -111,9 +111,8 @@ pub async fn press(state: &AppState, button_id: &str) -> Result<(), ActionError>
 pub(crate) mod testing {
     use super::*;
     use crate::config::Config;
-    use crate::hub::Hub;
     use crate::state::EventSink;
-    use std::sync::{atomic::AtomicU16, Arc, Mutex};
+    use std::sync::{Arc, Mutex};
 
     pub struct RecordingExecutor {
         pub ran: Mutex<Vec<Action>>,
@@ -160,14 +159,12 @@ pub(crate) mod testing {
 
     pub fn state_with(exec: Arc<dyn Executor>, sink: Arc<RecordingSink>) -> (Arc<AppState>, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let state = Arc::new(AppState {
-            data_dir: dir.path().to_path_buf(),
-            config: tokio::sync::RwLock::new(Config::default_with_token("secret".into())),
-            port: AtomicU16::new(0),
-            hub: Hub::new(sink.clone()),
-            executor: exec,
-            events: sink,
-        });
+        let state = Arc::new(AppState::new(
+            dir.path().to_path_buf(),
+            Config::default_with_token("secret".into()),
+            sink,
+            |_| exec,
+        ));
         (state, dir)
     }
 

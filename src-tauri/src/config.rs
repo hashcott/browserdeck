@@ -99,6 +99,8 @@ pub enum ConfigError {
     LabelTooLong,
     BadIconFile,
     BadTheme,
+    BadPort,
+    SaveFailed,
 }
 
 #[derive(Debug, PartialEq)]
@@ -153,6 +155,9 @@ impl Config {
         let g = &self.settings.grid;
         if !(1..=8).contains(&g.cols) || !(1..=8).contains(&g.rows) {
             return Err(BadGrid);
+        }
+        if self.settings.port == 0 {
+            return Err(BadPort);
         }
         let t = &self.settings.theme;
         if !(1..=40).contains(&t.len())

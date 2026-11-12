@@ -207,12 +207,10 @@ mod tests {
     use super::*;
     use crate::actions::{ActionError, Executor};
     use crate::config::{Action, Config};
-    use crate::hub::Hub;
     use crate::state::{CoreEvent, EventSink};
     use axum::body::Body;
     use axum::http::Request;
     use http_body_util::BodyExt;
-    use std::sync::atomic::AtomicU16;
     use tower::ServiceExt;
 
     struct OkExec;
@@ -231,14 +229,12 @@ mod tests {
 
     fn app() -> (Router, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
-        let state = Arc::new(AppState {
-            data_dir: dir.path().to_path_buf(),
-            config: tokio::sync::RwLock::new(Config::default_with_token("secret".into())),
-            port: AtomicU16::new(0),
-            hub: Hub::new(Arc::new(NullSink)),
-            executor: Arc::new(OkExec),
-            events: Arc::new(NullSink),
-        });
+        let state = Arc::new(AppState::new(
+            dir.path().to_path_buf(),
+            Config::default_with_token("secret".into()),
+            Arc::new(NullSink),
+            |_| Arc::new(OkExec),
+        ));
         (router(state), dir)
     }
 
@@ -275,14 +271,12 @@ mod tests {
     #[tokio::test]
     async fn empty_configured_token_never_authenticates() {
         let (_, d) = app();
-        let state = Arc::new(AppState {
-            data_dir: d.path().to_path_buf(),
-            config: tokio::sync::RwLock::new(Config::default_with_token(String::new())),
-            port: AtomicU16::new(0),
-            hub: Hub::new(Arc::new(NullSink)),
-            executor: Arc::new(OkExec),
-            events: Arc::new(NullSink),
-        });
+        let state = Arc::new(AppState::new(
+            d.path().to_path_buf(),
+            Config::default_with_token(String::new()),
+            Arc::new(NullSink),
+            |_| Arc::new(OkExec),
+        ));
         let app = router(state);
         assert_eq!(get(&app, "/?token=", None).await.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(get(&app, "/", Some("sd_token=")).await.status(), StatusCode::UNAUTHORIZED);
@@ -339,6 +333,34 @@ mod tests {
         let (_held, p) = bind(48100).await.unwrap();
         let (_l, got) = bind(p).await.unwrap();
         assert!((p + 1..=p + 9).contains(&got));
+    }
+
+    /// Same two checks as a manual curl against the running app, over a real socket.
+    #[tokio::test]
+    async fn real_socket_303_with_cookie_and_401_without_token() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let (_, d) = app();
+        let state = Arc::new(AppState::new(
+            d.path().to_path_buf(),
+            Config::default_with_token("secret".into()),
+            Arc::new(NullSink),
+            |_| Arc::new(OkExec),
+        ));
+        let (listener, port) = bind(48300).await.unwrap();
+        let router = router(state);
+        tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let fetch = |target: &'static str| async move {
+            let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let req = format!("GET {target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+            s.write_all(req.as_bytes()).await.unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).await.unwrap();
+            out
+        };
+        let ok = fetch("/?token=secret").await;
+        assert!(ok.starts_with("HTTP/1.1 303"), "{ok}");
+        assert!(ok.to_lowercase().contains("set-cookie: sd_token=secret"), "{ok}");
+        assert!(fetch("/").await.starts_with("HTTP/1.1 401"));
     }
 
     mod ws {

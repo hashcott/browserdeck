@@ -10,12 +10,29 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "Browserdeck", "width": 900, "height": 640 }],
-    "security": { "csp": null }
+    "windows": [
+      {
+        "title": "Browserdeck",
+        "width": 900,
+        "height": 640
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/icons/**"
+        ]
+      }
+    }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png", "icons/icon.ico"]
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
   }
 }
