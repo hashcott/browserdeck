@@ -1,18 +1,28 @@
 import type { Button, Theme } from "./types";
 
-/** Theme values reach the DOM only as CSS custom properties, never as stylesheet or HTML text. */
+const HEX = /^#[0-9a-f]{6}$/i;
+// Fallbacks (the keycap theme) for any value that is not a plain colour or an in-range number.
+const hex = (v: unknown, d: string): string => (typeof v === "string" && HEX.test(v) ? v : d);
+const num = (v: unknown, max: number, d: number): number =>
+  typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max ? v : d;
+
+/** Theme values reach the DOM only as CSS custom properties, never as stylesheet or HTML text.
+ *  Every value is re-checked here, so a hostile theme object cannot inject CSS. */
 export function themeVars(theme: Theme): Record<string, string> {
   const k = theme.key;
+  const ground = hex(theme.ground, "#22252b");
   return {
-    "--key-radius": `${k.radius}%`,
-    "--key-gap": `${k.gap}%`,
-    "--key-border": `${k.border_width}px solid ${k.border_color}`,
-    "--ground": theme.ground,
-    "--ink": theme.ink,
-    "--c-launch": theme.actions.launch,
-    "--c-hotkey": theme.actions.hotkey,
-    "--c-volume": theme.actions.volume,
-    "--c-obs_scene": theme.actions.obs_scene,
+    "--key-radius": `${num(k.radius, 50, 9)}%`,
+    "--key-gap": `${num(k.gap, 20, 9)}%`,
+    "--key-border": `${num(k.border_width, 8, 1)}px solid ${hex(k.border_color, "#1a1c20")}`,
+    "--ground": ground,
+    "--ink": hex(theme.ink, "#f6f1e4"),
+    // Selected-key outline: contrasts with the ground the keys sit on.
+    "--key-ring": keyInk(ground),
+    "--c-launch": hex(theme.actions.launch, "#f6f1e4"),
+    "--c-hotkey": hex(theme.actions.hotkey, "#2c3a55"),
+    "--c-volume": hex(theme.actions.volume, "#6f7d4f"),
+    "--c-obs_scene": hex(theme.actions.obs_scene, "#e8703a"),
   };
 }
 

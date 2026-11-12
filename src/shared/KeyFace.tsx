@@ -16,7 +16,8 @@ export interface KeyFaceProps {
 
 /** One button face. Presentational only: the caller wraps it in a <button> and owns all behaviour. */
 export function KeyFace({ button, theme, iconSrc, pressed, selected, error, disabled }: KeyFaceProps) {
-  const bg = keyColor(button, theme);
+  const raw = keyColor(button, theme);
+  const bg = /^#[0-9a-f]{6}$/i.test(raw) ? raw : "#f6f1e4";
   const k = theme.key;
   const cls = [
     "key-face",
@@ -32,12 +33,14 @@ export function KeyFace({ button, theme, iconSrc, pressed, selected, error, disa
   const icon = button.icon;
   return (
     <div className={cls} style={style}>
+      <div className="key-cap">
       {icon.kind === "emoji" ? (
         icon.value && <span className="key-icon" aria-hidden={button.label ? true : undefined}>{icon.value}</span>
       ) : (
         iconSrc && <img className="key-icon" src={iconSrc} alt="" draggable={false} />
       )}
       {button.label && <span className="key-label">{button.label}</span>}
+      </div>
     </div>
   );
 }

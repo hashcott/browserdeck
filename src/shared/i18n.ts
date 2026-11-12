@@ -12,6 +12,7 @@ export function resolveLang(setting: string, navigatorLanguage: string): Lang {
 
 /** Missing in the language: English; missing in both: the key. `{name}` is replaced from `vars`. */
 export function createT(lang: Lang): (key: string, vars?: Record<string, string>) => string {
+  const own = (l: Lang, k: string) => (Object.prototype.hasOwnProperty.call(tables[l], k) ? tables[l][k] : undefined);
   return (key, vars) =>
-    (tables[lang][key] ?? tables.en[key] ?? key).replace(/\{(\w+)\}/g, (m, k: string) => vars?.[k] ?? m);
+    (own(lang, key) ?? own("en", key) ?? key).replace(/\{(\w+)\}/g, (m, k: string) => vars?.[k] ?? m);
 }

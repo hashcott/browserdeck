@@ -79,7 +79,7 @@
   "error.bad_name": "The theme name is empty or too long.",
   "error.out_of_range": "A theme value is out of its allowed range.",
   "error.builtin_id": "This ID belongs to a built-in theme.",
-  "error.not_found": "Not found.",
+  "error.not_found": "That theme no longer exists.",
   "error.io": "The file could not be read or written.",
   "error.bad_type": "This file type is not supported."
 }

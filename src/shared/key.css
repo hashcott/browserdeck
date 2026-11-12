@@ -1,13 +1,22 @@
 /* One button face. Theme values arrive only as custom properties (see themeVars);
-   look variants are picked by fixed class names. Never rotated. */
+   look variants are picked by fixed class names. Never rotated.
+   .key-face is the square size container that fills its grid cell; everything sized in cqw
+   lives on the inner .key-cap, so it scales with the key's own width. */
 .key-face {
   --ring: 0px; --lip: 0px; --drop: 0px;
   font-family: Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   container-type: inline-size;
-  box-sizing: border-box;
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.key-cap {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 11cqw;
@@ -21,8 +30,6 @@
     inset 0 calc(var(--lip) * -1) 0 #00000014,
     0 var(--drop) 10px -4px #22252b55;
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 90ms ease-out;
-  user-select: none;
-  -webkit-user-select: none;
 }
 .key-icon { font-size: max(22px, 30cqw); line-height: 1; flex: none; width: max-content; max-width: 100%; }
 img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; object-fit: contain; }
@@ -41,28 +48,29 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
 }
 
 /* legend */
-.legend-center { align-items: center; justify-content: center; gap: 6cqw; text-align: center; }
-.legend-top_left { align-items: flex-start; justify-content: space-between; text-align: left; }
-.legend-bottom_left { align-items: flex-start; justify-content: flex-end; gap: 6cqw; text-align: left; }
+.legend-center .key-cap { align-items: center; justify-content: center; gap: 6cqw; text-align: center; }
+.legend-top_left .key-cap { align-items: flex-start; justify-content: space-between; text-align: left; }
+.legend-bottom_left .key-cap { align-items: flex-start; justify-content: flex-end; gap: 6cqw; text-align: left; }
 
 /* depth */
 .depth-flat { --ring: 0px; }
 .depth-dish { --ring: 5cqw; --lip: 5cqw; --drop: 6px; }
-.depth-raised { --lip: 7cqw; --drop: 5px; box-shadow: inset 0 2px 0 #ffffff44, inset 0 calc(var(--lip) * -1) 0 #00000026, 0 var(--drop) 8px -3px #0008; }
+.depth-raised { --lip: 7cqw; --drop: 5px; }
+.depth-raised .key-cap { box-shadow: inset 0 2px 0 #ffffff44, inset 0 calc(var(--lip) * -1) 0 #00000026, 0 var(--drop) 8px -3px #0008; }
 .depth-sticker { --ring: 2cqw; --drop: 3px; }
 
 /* press: pure CSS on a class, no transition so it shows at once */
-.is-pressed { transition: none; }
-.press-sink.is-pressed { transform: translateY(4px); --lip: 1.5cqw; --drop: 1px; }
-.press-dim.is-pressed { filter: brightness(0.7); }
-.press-lift.is-pressed { transform: translateY(-3px) scale(1.04); --drop: 10px; }
+.is-pressed .key-cap { transition: none; }
+.press-sink.is-pressed .key-cap { transform: translateY(4px); --lip: 1.5cqw; --drop: 1px; }
+.press-dim.is-pressed .key-cap { filter: brightness(0.7); }
+.press-lift.is-pressed .key-cap { transform: translateY(-3px) scale(1.04); --drop: 10px; }
 
-/* selected: 4px outline in the theme ink; siblings fade (the grid opts in with .deck-grid) */
-.key-face.is-selected { outline: 4px solid var(--ink); outline-offset: 3px; }
+/* selected: 4px outline contrasting with the theme ground (--key-ring); siblings fade (the grid opts in with .deck-grid) */
+.key-face.is-selected .key-cap { outline: 4px solid var(--key-ring); outline-offset: 3px; }
 .deck-grid:has(.key-face.is-selected) .key-face:not(.is-selected) { opacity: 0.55; }
 
 /* error and disabled carry a non-colour cue: a "!" badge, and a hatch over the face */
-.key-face.is-error::after {
+.key-face.is-error .key-cap::after {
   content: "!";
   position: absolute; top: 6cqw; right: 6cqw;
   width: 20cqw; height: 20cqw; min-width: 18px; min-height: 18px;
@@ -71,10 +79,18 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
   background: var(--key-ink); color: var(--key-bg);
   font-weight: 800; font-size: max(13px, 14cqw); line-height: 1;
 }
-.key-face.is-disabled { filter: grayscale(0.7); opacity: 0.6; }
-.key-face.is-disabled::before {
+.key-face.is-disabled .key-cap { filter: grayscale(0.7); opacity: 0.6; }
+.key-face.is-disabled .key-cap::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(135deg, transparent 0 6px, #00000033 6px 8px);
 }
 
-@media (prefers-reduced-motion: reduce) { .key-face { transition: none; } }
+/* Tiny keys: not enough room for icon and label, so the icon alone, centred (the caller's button carries the name). */
+@container (max-width: 72px) {
+  .key-face[class] .key-cap { padding: 6cqw; align-items: center; justify-content: center; }
+  .key-icon ~ .key-label { display: none; }
+  .key-icon { font-size: 52cqw; }
+  img.key-icon { width: 52cqw; height: 52cqw; }
+}
+
+@media (prefers-reduced-motion: reduce) { .key-cap { transition: none; } }

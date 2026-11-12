@@ -49,3 +49,7 @@ test("ALL_ERROR_CODES covers every error variant in the Rust enums", () => {
   expect(rust.length).toBeGreaterThan(20);
   expect(rust.filter((c) => !ALL_ERROR_CODES.includes(c))).toEqual([]);
 });
+test("createT ignores object prototype names", () => {
+  expect(createT("en")("constructor")).toBe("constructor");
+  expect(createT("vi")("toString")).toBe("toString");
+});
