@@ -1,8 +1,13 @@
+use crate::actions;
 use crate::auth;
 use crate::config::is_icon_file_name;
-use crate::state::AppState;
+use crate::hub::{layout_msg, ClientMsg, ServerMsg};
+use crate::state::{AppState, CoreEvent};
 use axum::{
-    extract::{Path, Request, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Path, Request, State,
+    },
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
@@ -39,6 +44,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/", get(index))
         .route("/assets/{*path}", get(asset))
         .route("/icons/{file}", get(icon))
+        .route("/ws", get(ws_upgrade))
         .layer(middleware::from_fn_with_state(state.clone(), gate))
         .with_state(state)
 }
@@ -121,6 +127,51 @@ async fn icon(State(state): State<Arc<AppState>>, Path(file): Path<String>) -> R
     match tokio::fs::read(state.data_dir.join("icons").join(&file)).await {
         Ok(bytes) => file_response(&file, bytes),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+const MAX_WS_MESSAGE: usize = 4096;
+
+async fn ws_upgrade(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) -> Response {
+    ws.max_message_size(MAX_WS_MESSAGE).on_upgrade(move |socket| phone_session(state, socket))
+}
+
+async fn send_msg(socket: &mut WebSocket, msg: &ServerMsg) -> bool {
+    let Ok(json) = serde_json::to_string(msg) else { return false };
+    socket.send(Message::Text(json.into())).await.is_ok()
+}
+
+async fn phone_session(state: Arc<AppState>, mut socket: WebSocket) {
+    let (conn_id, mut rx) = state.hub.attach().await;
+    state.events.emit(CoreEvent::PhoneStatus { connected: true });
+    if send_msg(&mut socket, &layout_msg(&state).await).await {
+        loop {
+            tokio::select! {
+                out = rx.recv() => match out {
+                    Some(msg) => {
+                        let kicked = msg == ServerMsg::Kicked;
+                        if !send_msg(&mut socket, &msg).await || kicked { break }
+                    }
+                    None => break,
+                },
+                inc = socket.recv() => match inc {
+                    Some(Ok(Message::Text(t))) => {
+                        // Garbage (or any type other than `press`) is ignored, connection stays open.
+                        let Ok(ClientMsg::Press { press_id, button_id }) = serde_json::from_str(&t) else { continue };
+                        let error = actions::press(&state, &button_id).await.err();
+                        let res = ServerMsg::Result { press_id, ok: error.is_none(), error };
+                        if !send_msg(&mut socket, &res).await { break }
+                    }
+                    Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                    Some(Ok(_)) => {}
+                },
+            }
+        }
+    }
+    state.hub.detach(conn_id).await;
+    // A kicked old connection closing must not report "disconnected" while a new phone is attached.
+    if !state.hub.connected().await {
+        state.events.emit(CoreEvent::PhoneStatus { connected: false });
     }
 }
 
@@ -261,5 +312,134 @@ mod tests {
         let (_held, p) = bind(48100).await.unwrap();
         let (_l, got) = bind(p).await.unwrap();
         assert!((p + 1..=p + 9).contains(&got));
+    }
+
+    mod ws {
+        use super::*;
+        use crate::actions::testing::{fixture, Fixture};
+        use futures_util::{SinkExt, StreamExt};
+        use serde_json::{json, Value};
+        use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message as M};
+
+        type Client = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+        async fn serve(f: &Fixture) -> u16 {
+            let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = l.local_addr().unwrap().port();
+            let app = router(f.state.clone());
+            tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+            port
+        }
+
+        async fn connect(port: u16, cookie: Option<&str>) -> Result<Client, tokio_tungstenite::tungstenite::Error> {
+            let mut req = format!("ws://127.0.0.1:{port}/ws").into_client_request().unwrap();
+            if let Some(c) = cookie {
+                req.headers_mut().insert(header::COOKIE, c.parse().unwrap());
+            }
+            tokio_tungstenite::connect_async(req).await.map(|(c, _)| c)
+        }
+
+        async fn next_json(c: &mut Client) -> Value {
+            loop {
+                match c.next().await.unwrap().unwrap() {
+                    M::Text(t) => return serde_json::from_str(&t).unwrap(),
+                    _ => continue,
+                }
+            }
+        }
+
+        async fn paired(f: &Fixture) -> Client {
+            let mut c = connect(serve(f).await, OK).await.unwrap();
+            assert_eq!(next_json(&mut c).await["type"], "layout");
+            c
+        }
+
+        #[tokio::test]
+        async fn ws_without_token_is_rejected() {
+            let f = fixture(Ok(()));
+            let port = serve(&f).await;
+            match connect(port, None).await {
+                Err(tokio_tungstenite::tungstenite::Error::Http(r)) => assert_eq!(r.status(), 401),
+                other => panic!("expected 401, got {:?}", other.map(|_| ())),
+            }
+        }
+
+        #[tokio::test]
+        async fn ws_sends_layout_first() {
+            let f = fixture(Ok(()));
+            let mut c = connect(serve(&f).await, OK).await.unwrap();
+            let m = next_json(&mut c).await;
+            assert_eq!(m["type"], "layout");
+            assert_eq!(m["pages"].as_array().unwrap().len(), 1);
+            assert_eq!(m["pages"][0]["buttons"].as_array().unwrap().len(), 3);
+            assert_eq!(m["theme"]["id"], "keycap");
+        }
+
+        #[tokio::test]
+        async fn ws_press_of_deleted_button_reports_unknown_button() {
+            let f = fixture(Ok(()));
+            let mut c = paired(&f).await;
+            let (gone, kept) = {
+                let mut cfg = f.state.config.write().await;
+                let b = &mut cfg.pages[0].buttons;
+                (b.remove(0).id, b[0].id.clone())
+            };
+            c.send(M::text(json!({"type":"press","press_id":7,"button_id":gone}).to_string())).await.unwrap();
+            assert_eq!(
+                next_json(&mut c).await,
+                json!({"type":"result","press_id":7,"ok":false,"error":"unknown_button"})
+            );
+            c.send(M::text(json!({"type":"press","press_id":8,"button_id":kept}).to_string())).await.unwrap();
+            assert_eq!(next_json(&mut c).await, json!({"type":"result","press_id":8,"ok":true,"error":null}));
+        }
+
+        #[tokio::test]
+        async fn ws_ignores_garbage_and_stays_open() {
+            let f = fixture(Ok(()));
+            let mut c = paired(&f).await;
+            let id = f.state.config.read().await.pages[0].buttons[0].id.clone();
+            c.send(M::text("hello")).await.unwrap();
+            c.send(M::text(r#"{"type":"nope"}"#)).await.unwrap();
+            c.send(M::text(json!({"type":"press","press_id":2,"button_id":id}).to_string())).await.unwrap();
+            assert_eq!(next_json(&mut c).await, json!({"type":"result","press_id":2,"ok":true,"error":null}));
+        }
+
+        #[tokio::test]
+        async fn ws_oversized_message_runs_nothing() {
+            let f = fixture(Ok(()));
+            let mut c = paired(&f).await;
+            let id = f.state.config.read().await.pages[0].buttons[0].id.clone();
+            let big = json!({"type":"press","press_id":1,"button_id":id,"pad":"x".repeat(5000)}).to_string();
+            c.send(M::text(big)).await.unwrap();
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(500), c.next()).await;
+            assert!(f.exec.ran.lock().unwrap().is_empty());
+        }
+
+        #[tokio::test]
+        async fn ws_message_carrying_a_path_does_nothing() {
+            let f = fixture(Ok(()));
+            let mut c = paired(&f).await;
+            c.send(M::text(r#"{"type":"launch","path":"C:\\x.exe"}"#)).await.unwrap();
+            let id = f.state.config.read().await.pages[0].buttons[0].id.clone();
+            c.send(M::text(json!({"type":"press","press_id":3,"button_id":id}).to_string())).await.unwrap();
+            assert_eq!(next_json(&mut c).await["press_id"], 3);
+            assert_eq!(f.exec.ran.lock().unwrap().len(), 1); // only the real press
+        }
+
+        #[tokio::test]
+        async fn ws_phone_status_follows_current_connection() {
+            let f = fixture(Ok(()));
+            let port = serve(&f).await;
+            let mut a = connect(port, OK).await.unwrap();
+            next_json(&mut a).await;
+            let mut b = connect(port, OK).await.unwrap();
+            next_json(&mut b).await;
+            assert_eq!(next_json(&mut a).await["type"], "kicked");
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            assert!(f.sink.0.lock().unwrap().iter().all(|e| *e != CoreEvent::PhoneStatus { connected: false }));
+            b.close(None).await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            assert_eq!(f.sink.0.lock().unwrap().last(), Some(&CoreEvent::PhoneStatus { connected: false }));
+        }
     }
 }
