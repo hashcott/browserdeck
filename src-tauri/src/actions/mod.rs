@@ -1,3 +1,8 @@
+pub mod hotkey;
+pub mod keymap;
+pub mod launch;
+pub mod volume;
+
 use crate::config::Action;
 use crate::state::{AppState, CoreEvent};
 use serde::{Deserialize, Serialize};
@@ -20,6 +25,32 @@ pub enum ActionError {
 #[async_trait::async_trait]
 pub trait Executor: Send + Sync {
     async fn run(&self, action: &Action) -> Result<(), ActionError>;
+}
+
+/// Keeps COM initialised on the current thread until dropped. A thread already in the other
+/// apartment mode (`RPC_E_CHANGED_MODE`) stays as it is; any other failure surfaces in the COM call
+/// that follows. Not `Send`, so it is always released on the thread that initialised it.
+#[cfg(windows)]
+pub(crate) struct ComGuard(bool, std::marker::PhantomData<*const ()>);
+
+#[cfg(windows)]
+impl ComGuard {
+    pub(crate) fn init(mode: windows::Win32::System::Com::COINIT) -> ComGuard {
+        // SAFETY: the reserved pointer is None; a success is balanced by CoUninitialize in Drop.
+        let hr = unsafe { windows::Win32::System::Com::CoInitializeEx(None, mode) };
+        // S_OK and S_FALSE (already initialised) both succeed and both need a CoUninitialize.
+        ComGuard(hr.is_ok(), std::marker::PhantomData)
+    }
+}
+
+#[cfg(windows)]
+impl Drop for ComGuard {
+    fn drop(&mut self) {
+        if self.0 {
+            // SAFETY: balances this guard's successful CoInitializeEx, on the same thread.
+            unsafe { windows::Win32::System::Com::CoUninitialize() };
+        }
+    }
 }
 
 pub const PRESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
