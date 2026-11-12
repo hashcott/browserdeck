@@ -72,22 +72,23 @@ pub fn runtime(state: &AppState) -> Runtime {
 pub async fn apply_config(state: &AppState, mut config: Config) -> Result<(), ConfigError> {
     config.validate()?;
     config.schema_version = SCHEMA_VERSION;
-    let obs = config.settings.obs.clone();
     {
         // Held across the write so concurrent saves (and token changes) cannot interleave file and memory.
         let mut cur = state.config.write().await;
         config.settings.token = cur.settings.token.clone();
         config::save(&state.data_dir, &config).map_err(|_| ConfigError::SaveFailed)?;
         *cur = config;
+        // Inside the lock so the channel always ends at the last saved value. Only a real change
+        // restarts the OBS connection.
+        let obs = cur.settings.obs.clone();
+        state.obs_settings.send_if_modified(|v| {
+            let changed = *v != obs;
+            if changed {
+                *v = obs;
+            }
+            changed
+        });
     }
-    // Only a real change restarts the OBS connection.
-    state.obs_settings.send_if_modified(|v| {
-        let changed = *v != obs;
-        if changed {
-            *v = obs;
-        }
-        changed
-    });
     state.hub.send(layout_msg(state).await).await;
     Ok(())
 }
@@ -162,19 +163,21 @@ pub async fn import_icon_file(state: &AppState, source: &Path) -> Result<String,
 }
 
 /// Deleting the active theme falls back to the default and pushes a fresh layout.
+/// Under the config lock: persist the fallback first (a failed save aborts, file kept), then delete.
 pub async fn remove_theme(state: &AppState, id: &str) -> Result<(), ThemeError> {
-    themes::delete(&state.data_dir, id)?;
     let was_active = {
         let mut cur = state.config.write().await;
+        if themes::list(&state.data_dir).iter().any(|t| t.id == id && t.builtin) {
+            return Err(ThemeError::BuiltinId);
+        }
         let active = cur.settings.theme == id;
         if active {
             let mut next = cur.clone();
             next.settings.theme = DEFAULT_THEME_ID.to_string();
-            // A failed save leaves memory unchanged; resolve() already falls back for the missing file.
-            if config::save(&state.data_dir, &next).is_ok() {
-                *cur = next;
-            }
+            config::save(&state.data_dir, &next).map_err(|_| ThemeError::Io)?;
+            *cur = next;
         }
+        themes::delete(&state.data_dir, id)?;
         active
     };
     if was_active {
@@ -468,6 +471,74 @@ mod tests {
         assert!(rx.try_recv().is_err());
         assert_eq!(remove_theme(&f.state, "mine").await, Err(ThemeError::NotFound));
         assert_eq!(remove_theme(&f.state, "keycap").await, Err(ThemeError::BuiltinId));
+    }
+
+    /// Makes `config::save` fail: its temp file path is a directory.
+    fn break_saving(f: &Fixture) {
+        std::fs::create_dir(f.state.data_dir.join("config.json.tmp")).unwrap();
+    }
+
+    #[tokio::test]
+    async fn save_failure_returns_save_failed_and_changes_nothing() {
+        let f = fixture(Ok(()));
+        let (_id, mut rx) = f.state.hub.attach().await;
+        let mut obs_rx = f.state.obs_settings.subscribe();
+        obs_rx.borrow_and_update();
+        let before = cfg(&f).await;
+        break_saving(&f);
+        let mut c = before.clone();
+        c.settings.language = "vi".into();
+        c.settings.obs.password = "pw".into();
+        assert_eq!(apply_config(&f.state, c).await, Err(ConfigError::SaveFailed));
+        assert_eq!(cfg(&f).await, before);
+        assert!(rx.try_recv().is_err());
+        assert!(!obs_rx.has_changed().unwrap());
+        assert_eq!(obs_rx.borrow().password, before.settings.obs.password);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_saves_leave_obs_channel_equal_to_config() {
+        let f = fixture(Ok(()));
+        let base = cfg(&f).await;
+        let tasks: Vec<_> = (0..40)
+            .map(|i| {
+                let state = f.state.clone();
+                let mut c = base.clone();
+                c.settings.obs.password = format!("pw{i}");
+                tokio::spawn(async move { apply_config(&state, c).await.unwrap() })
+            })
+            .collect();
+        for t in tasks {
+            t.await.unwrap();
+        }
+        let in_config = cfg(&f).await.settings.obs;
+        assert_eq!(*f.state.obs_settings.borrow(), in_config);
+    }
+
+    #[tokio::test]
+    async fn deleting_active_theme_with_unsavable_config_keeps_everything() {
+        let f = fixture(Ok(()));
+        let src = theme_file(&f.state.data_dir);
+        themes::import(&f.state.data_dir, &src).unwrap();
+        let mut c = cfg(&f).await;
+        c.settings.theme = "mine".into();
+        apply_config(&f.state, c).await.unwrap();
+        let (_id, mut rx) = f.state.hub.attach().await;
+        break_saving(&f);
+        assert_eq!(remove_theme(&f.state, "mine").await, Err(ThemeError::Io));
+        assert_eq!(cfg(&f).await.settings.theme, "mine");
+        assert!(themes::list(&f.state.data_dir).iter().any(|t| t.id == "mine"));
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn deleting_active_builtin_theme_is_refused_without_side_effects() {
+        let f = fixture(Ok(()));
+        let mut c = cfg(&f).await;
+        c.settings.theme = "arcade".into();
+        apply_config(&f.state, c).await.unwrap();
+        assert_eq!(remove_theme(&f.state, "arcade").await, Err(ThemeError::BuiltinId));
+        assert_eq!(cfg(&f).await.settings.theme, "arcade");
     }
 
     #[tokio::test]
