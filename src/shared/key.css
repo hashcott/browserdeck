@@ -65,9 +65,9 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
 .press-dim.is-pressed .key-cap { filter: brightness(0.7); }
 .press-lift.is-pressed .key-cap { transform: translateY(-3px) scale(1.04); --drop: 10px; }
 
-/* selected: 4px outline contrasting with the theme ground (--key-ring); siblings fade (the grid opts in with .deck-grid) */
+/* selected: 4px outline contrasting with the theme ground (--key-ring); siblings fade to 80% so dark labels stay legible (the grid opts in with .deck-grid) */
 .key-face.is-selected .key-cap { outline: 4px solid var(--key-ring); outline-offset: 3px; }
-.deck-grid:has(.key-face.is-selected) .key-face:not(.is-selected) { opacity: 0.55; }
+.deck-grid:has(.key-face.is-selected) .key-face:not(.is-selected) { opacity: 0.8; }
 
 /* error and disabled carry a non-colour cue: a "!" badge, and a hatch over the face */
 .key-face.is-error .key-cap::after {

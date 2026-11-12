@@ -1,8 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@fontsource-variable/figtree";
+import { App } from "./App";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <p>Deck desktop</p>
+    <App />
   </React.StrictMode>,
 );
