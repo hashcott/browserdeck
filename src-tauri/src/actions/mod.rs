@@ -19,6 +19,7 @@ pub enum ActionError {
     VolumeFailed,
     ObsNotConnected,
     ObsSceneMissing,
+    ObsRequestFailed,
     UnsupportedPlatform,
     Timeout,
 }
