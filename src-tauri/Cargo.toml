@@ -20,6 +20,7 @@ axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "fs", "macros", "time"] }
 rust-embed = "8"
 async-trait = "0.1"
+obws = "0.15.0"
 
 [dev-dependencies]
 tempfile = "3"

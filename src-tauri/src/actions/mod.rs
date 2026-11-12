@@ -1,6 +1,7 @@
 pub mod hotkey;
 pub mod keymap;
 pub mod launch;
+pub mod obs;
 pub mod volume;
 
 use crate::config::Action;
@@ -49,6 +50,40 @@ impl Drop for ComGuard {
         if self.0 {
             // SAFETY: balances this guard's successful CoInitializeEx, on the same thread.
             unsafe { windows::Win32::System::Com::CoUninitialize() };
+        }
+    }
+}
+
+/// Runs the real actions. The blocking ones go through `spawn_blocking`; a panic inside one
+/// (a `JoinError`) maps to that action's own failure code.
+pub struct SystemExecutor {
+    pub obs: obs::ObsClient,
+}
+
+#[async_trait::async_trait]
+impl Executor for SystemExecutor {
+    async fn run(&self, action: &Action) -> Result<(), ActionError> {
+        match action {
+            Action::Launch { path, args } => {
+                let (path, args) = (path.clone(), args.clone());
+                tokio::task::spawn_blocking(move || launch::launch(&path, &args))
+                    .await
+                    .unwrap_or(Err(ActionError::LaunchFailed))
+            }
+            Action::Volume { op } => {
+                let op = *op;
+                tokio::task::spawn_blocking(move || volume::volume(op))
+                    .await
+                    .unwrap_or(Err(ActionError::VolumeFailed))
+            }
+            // No hotkey code fits a panic better; the chord was not (fully) sent.
+            Action::Hotkey { keys } => {
+                let keys = keys.clone();
+                tokio::task::spawn_blocking(move || hotkey::send_chord(&keys))
+                    .await
+                    .unwrap_or(Err(ActionError::InvalidHotkey))
+            }
+            Action::ObsScene { scene } => self.obs.set_scene(scene).await,
         }
     }
 }
@@ -190,5 +225,32 @@ mod tests {
             *sink.0.lock().unwrap(),
             vec![CoreEvent::ActionFailed { button_id: id, error: ActionError::Timeout }]
         );
+    }
+
+    fn system_executor() -> SystemExecutor {
+        let (_tx, rx) = tokio::sync::watch::channel(crate::config::ObsSettings {
+            host: "127.0.0.1".into(),
+            port: {
+                let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+                l.local_addr().unwrap().port()
+            },
+            password: String::new(),
+        });
+        // `_tx` drops here: the OBS task exits and the client stays Disconnected.
+        SystemExecutor { obs: obs::ObsClient::spawn(rx, Arc::new(testing::RecordingSink::default())) }
+    }
+
+    #[tokio::test]
+    async fn executor_routes_obs_scene_to_obs_client() {
+        let r = system_executor().run(&Action::ObsScene { scene: "Live".into() }).await;
+        assert_eq!(r, Err(ActionError::ObsNotConnected));
+    }
+
+    #[tokio::test]
+    async fn executor_routes_launch() {
+        let r = system_executor()
+            .run(&Action::Launch { path: "/definitely/not/here.exe".into(), args: vec![] })
+            .await;
+        assert_eq!(r, Err(ActionError::FileNotFound));
     }
 }
