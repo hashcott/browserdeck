@@ -9,7 +9,6 @@ import type { TestResult } from "./Inspector";
 import { defaultAction, moveButton, newButton, placeNew, removeButton, updateButton } from "./layout";
 import type { LoadedStore } from "../useConfigStore";
 
-const TOAST_MS = 6000;
 const IMAGE_EXT = ["png", "jpg", "jpeg", "webp"];
 
 export interface EditorProps {
@@ -19,9 +18,11 @@ export interface EditorProps {
   onPair(): void;
   /** The settings button in the top bar. */
   onSettings(): void;
+  /** Shows a message in the app's one toast region. */
+  showToast(text: string): void;
 }
 
-export function Editor({ store, t, onPair, onSettings }: EditorProps) {
+export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps) {
   const { config, runtime, status, commit, flush, latest } = store;
   const [theme, setTheme] = useState<Theme | null>(null);
   const [scenes, setScenes] = useState<string[]>([]);
@@ -29,35 +30,18 @@ export function Editor({ store, t, onPair, onSettings }: EditorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [focusReq, setFocusReq] = useState<{ slot: number; tick: number } | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const tRef = useRef(t);
   tRef.current = t;
 
-  const showToast = useCallback((text: string) => {
-    setToast(text);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
-  }, []);
   const showError = useCallback((code: unknown) => {
     const key = `error.${String(code)}`;
     showToast(tRef.current(key) === key ? tRef.current("error.unknown") : tRef.current(key));
   }, [showToast]);
 
-  useEffect(() => () => clearTimeout(toastTimer.current), []);
-  // A rejected save, or a button press from the phone that failed.
-  const { saveError, actionError } = store;
-  useEffect(() => { if (saveError) showError(saveError.code); }, [saveError, showError]);
-  useEffect(() => {
-    if (!actionError) return;
-    const key = `error.${String(actionError.code)}`;
-    const reason = tRef.current(key) === key ? tRef.current("error.unknown") : tRef.current(key);
-    showToast(tRef.current("editor.pressFailed", { reason }));
-  }, [actionError, showToast]);
 
   const themeId = config.settings.theme;
   useEffect(() => {
@@ -176,7 +160,7 @@ export function Editor({ store, t, onPair, onSettings }: EditorProps) {
     settings: onSettings,
   };
 
-  if (!theme || !page) return <p className="loading" role="status">{toast ?? t("common.loading")}</p>;
+  if (!theme || !page) return <p className="loading" role="status">{t("common.loading")}</p>;
 
   const notices: Notice[] = [];
   if (runtime.recovered_backup) notices.push({ id: "backup", text: t("editor.recovered", { file: runtime.recovered_backup }) });
@@ -190,7 +174,7 @@ export function Editor({ store, t, onPair, onSettings }: EditorProps) {
   return (
     <EditorView
       config={config} theme={theme} pageId={page.id} selectedId={selectedId} confirm={confirm} status={status}
-      scenes={scenes} platform={runtime.platform} notices={notices.filter((n) => !dismissed.has(n.id))} toast={toast}
+      scenes={scenes} platform={runtime.platform} notices={notices.filter((n) => !dismissed.has(n.id))}
       testResult={testResult} testing={testing} focusReq={focusReq} t={t}
       iconSrc={(b) => (b.icon.kind === "image" ? convertFileSrc(`${icons}/${b.icon.file}`) : undefined)}
       on={on}

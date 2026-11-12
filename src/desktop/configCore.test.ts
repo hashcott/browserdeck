@@ -78,3 +78,27 @@ test("replace adopts what the core holds and makes it the rollback point", async
   expect(errors).toEqual(["bad_port"]);
   expect(shown[shown.length - 1]).toEqual(cfg("vi", 7));
 });
+test("reload does not overwrite an edit committed while the fetch was pending", async () => {
+  const sent: string[] = [];
+  const { core, shown } = setup(async (c) => { sent.push(c.settings.language); });
+  const gate = defer();
+  let calls = 0;
+  const fetchCfg = async () => {
+    calls++;
+    if (calls === 1) { await gate.p; return cfg("stale"); }
+    return cfg("fresh");
+  };
+  const done = core.reload(fetchCfg);
+  await vi.advanceTimersByTimeAsync(0);
+  core.commit(cfg("typed")); // arrives while the first fetch is pending
+  gate.resolve();
+  expect(await done).toBe(true);
+  expect(sent).toEqual(["typed"]); // the edit was saved before the second fetch
+  expect(shown.map((c) => c.settings.language)).not.toContain("stale");
+  expect(core.latest()?.settings.language).toBe("fresh");
+});
+test("reload with no edit in between adopts the fetched config", async () => {
+  const { core } = setup(async () => {});
+  expect(await core.reload(async () => cfg("vi"))).toBe(true);
+  expect(core.latest()?.settings.language).toBe("vi");
+});

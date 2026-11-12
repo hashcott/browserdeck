@@ -48,7 +48,6 @@ export interface EditorViewProps {
   scenes: string[];
   platform: string;
   notices: Notice[];
-  toast: string | null;
   testResult: TestResult | null;
   testing: boolean;
   focusReq: { slot: number; tick: number } | null;
@@ -175,7 +174,6 @@ export function EditorView(p: EditorViewProps) {
           onTest={() => selected && on.test(selected.id)} onAskDelete={() => selected && on.askDeleteButton(selected.id)}
           onDelete={() => selected && on.deleteButton(selected.id)} onCancelDelete={on.cancelConfirm} />
 
-        <div className="toast" role="status" aria-live="polite">{p.toast && <span><Icon name="alert" size={18} />{p.toast}</span>}</div>
       </div>
 
       <DragOverlay dropAnimation={null}>

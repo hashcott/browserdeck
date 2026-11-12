@@ -15,6 +15,7 @@ export function createConfigCore(send: (c: Config) => Promise<void>, hooks: Core
   let cur: Config | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let queue: ReturnType<typeof createSaveQueue<Config>> | undefined;
+  let edits = 0; // counts commits, so a reload can tell an edit arrived while it was fetching
 
   const makeQueue = (initial: Config) => createSaveQueue<Config>(send, () => {}, (err, good) => {
     if (good) { cur = good; hooks.onConfig(good); }
@@ -32,6 +33,7 @@ export function createConfigCore(send: (c: Config) => Promise<void>, hooks: Core
     },
     /** `slow` = typing or dragging: the save is debounced and a newer edit replaces a pending one. */
     commit(next: Config, slow = false) {
+      edits++;
       cur = next;
       hooks.onConfig(next);
       cancelTimer();
@@ -42,6 +44,18 @@ export function createConfigCore(send: (c: Config) => Promise<void>, hooks: Core
     async flush() {
       if (timer) { cancelTimer(); queue?.save(cur!); }
       await queue?.idle();
+    },
+    /** Takes the config the core holds, for when the core changed it itself. An edit committed while the fetch was
+     *  pending would be overwritten, so in that case the edit is saved first and the config fetched again.
+     *  Returns false if edits kept arriving (the fetched config was not adopted; the next save carries the state). */
+    async reload(fetchCfg: () => Promise<Config>): Promise<boolean> {
+      for (let i = 0; i < 3; i++) {
+        await core.flush();
+        const stamp = edits;
+        const fresh = await fetchCfg();
+        if (edits === stamp) { core.replace(fresh); return true; }
+      }
+      return false;
     },
     /** The config as it is right now, including edits React has not rendered yet. */
     latest: () => cur,

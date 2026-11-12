@@ -71,7 +71,7 @@ html, body, #root { margin: 0; height: 100%; overflow: hidden; }
 .notice span { flex: 1; min-width: 0; }
 .notice-x { all: unset; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r2); cursor: pointer; }
 .notice-x:hover { background: #00000014; }
-.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(560px, calc(100vw - 48px)); pointer-events: none; z-index: 30; }
+.toast { --cream: #f6f1e4; --orange: #e8703a; --ink: #22252b; --r: 10px; font: 500 15px/1.4 "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(560px, calc(100vw - 48px)); pointer-events: none; z-index: 30; }
 .toast span { display: inline-flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: var(--r); background: var(--cream); color: var(--ink); font-weight: 700; box-shadow: 0 8px 24px -8px #000a, 0 0 0 2px var(--orange); }
 
 /* left column */

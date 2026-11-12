@@ -63,8 +63,8 @@ export function useConfigStore() {
   return {
     config, runtime, runtimeFailed, status, saveError, actionError, loadFailed, retry: () => setAttempt((n) => n + 1),
     commit: core.commit, flush: core.flush, latest: core.latest,
-    /** Re-reads the config from the core, for when the core changed it itself. Flushes pending saves first. */
-    async reload() { await core.flush(); core.replace(await api.getConfig()); },
+    /** Re-reads the config from the core, for when the core changed it itself. Flushes pending saves first, and never overwrites a newer edit. */
+    reload: () => core.reload(api.getConfig),
   };
 }
 export type ConfigStore = ReturnType<typeof useConfigStore>;
