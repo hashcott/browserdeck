@@ -11,7 +11,8 @@ const errorText = (t: T, code: unknown) => {
 };
 
 export function Pairing({ store, t, onBack }: { store: LoadedStore; t: T; onBack(): void }) {
-  const { runtime, config, commit, latest } = store;
+  const { runtime, config, commit, latest, saveError } = store;
+  const baseline = useRef(saveError?.n ?? 0);
   const [state, setState] = useState<PairingState>({ kind: "loading" });
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,17 +25,21 @@ export function Pairing({ store, t, onBack }: { store: LoadedStore; t: T; onBack
     try {
       const info = await api.pairingInfo();
       if (alive.current) setState({ kind: "info", info });
-    } catch (e) { if (alive.current) { setState({ kind: "info", info: { addresses: [], selected: null } }); setError(errorText(t, e)); } }
+    } catch (e) { if (alive.current) setState({ kind: "load_error", text: `${t("pairing.loadError")} ${errorText(t, e)}` }); }
   }, [runtime.server_error, t]);
   useEffect(() => { void load(); }, [load]);
 
   return (
     <PairingScreen
-      state={state} phoneConnected={store.status.phone_connected} confirmingRegenerate={confirming} error={error} t={t}
-      onPickIp={(ip) => {
+      state={state} phoneConnected={store.status.phone_connected} confirmingRegenerate={confirming} error={error ?? (saveError && saveError.n > baseline.current ? errorText(t, saveError.code) : null)} t={t}
+      onPickIp={async (ip) => {
+        const prev = state.kind === "info" ? state.info.selected : null;
         setState((s) => (s.kind === "info" ? { kind: "info", info: { ...s.info, selected: ip } } : s));
         const cur = latest() ?? config;
         commit({ ...cur, settings: { ...cur.settings, preferred_ip: ip } });
+        await store.flush();
+        // A rejected save rolled the config back: put the select back too (the store's error says why).
+        if (alive.current && latest()?.settings.preferred_ip !== ip) setState((s) => (s.kind === "info" ? { kind: "info", info: { ...s.info, selected: prev } } : s));
       }}
       onAskRegenerate={() => { setConfirming(true); setError(null); }}
       onCancelRegenerate={() => setConfirming(false)}

@@ -9,7 +9,7 @@ const t = createT("en");
 const config = { schema_version: 1, pages: [], settings: { token: "", port: 47825, obs: { host: "localhost", port: 4455, password: "pw" },
   grid: { cols: 4, rows: 3 }, language: "auto", run_as_admin: false, autostart: false, tray_notice_shown: false, preferred_ip: null, theme: "keycap" } } as Config;
 const noop = () => {};
-const on = { back: noop, pickTheme: noop, importTheme: noop, askDeleteTheme: noop, deleteTheme: noop, cancelDeleteTheme: noop, setLanguage: noop, setGrid: noop, clearGridError: noop, setObs: noop, setPort: noop };
+const on = { back: noop, pickTheme: noop, importTheme: noop, askDeleteTheme: noop, deleteTheme: noop, cancelDeleteTheme: noop, setLanguage: noop, setGrid: () => true, clearGridError: noop, setObs: noop, setPort: noop };
 const render = (extra = {}) => renderToStaticMarkup(
   <SettingsScreen config={config} themes={[{ id: "keycap", name: "Keycap", author: "Us", builtin: true }]} previews={{ keycap: keycap as Theme }}
     obs="connected" gridError={false} themeError={null} saveError={null} confirmDeleteId={null} t={t} on={on} {...extra} />);

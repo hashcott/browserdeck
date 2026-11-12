@@ -12,17 +12,16 @@ const errorText = (t: T, code: unknown) => {
   const key = `error.${String(code)}`;
   return t(key) === key ? t("error.unknown") : t(key);
 };
-const DEFAULT_THEME = "keycap";
 
 export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBack(): void }) {
-  const { config, commit, latest } = store;
+  const { config, commit, latest, saveError } = store;
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [previews, setPreviews] = useState<Record<string, Theme>>({});
   const [gridError, setGridError] = useState(false);
   const [themeError, setThemeError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const alive = useRef(true);
-  const baseline = useRef(store.error?.n ?? 0);
+  const baseline = useRef(saveError?.n ?? 0);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   const loadThemes = useCallback(async () => {
@@ -30,22 +29,23 @@ export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBac
       const list = await api.listThemes();
       if (!alive.current) return;
       setThemes(list);
+      setThemeError(null);
       const got = await Promise.all(list.map((th) => api.getTheme(th.id).then((full) => [th.id, full] as const, () => null)));
       if (alive.current) setPreviews(Object.fromEntries(got.filter((x) => x !== null)));
     } catch (e) { if (alive.current) setThemeError(errorText(t, e)); }
   }, [t]);
   useEffect(() => { void loadThemes(); }, [loadThemes]);
 
-  const edit = (fn: (c: typeof config) => typeof config, slow = false) => commit(fn(latest() ?? config), slow);
+  const edit = (fn: (c: typeof config) => typeof config) => commit(fn(latest() ?? config));
 
   return (
     <SettingsScreen
       config={config} themes={themes} previews={previews} obs={store.status.obs} gridError={gridError}
       themeError={themeError} confirmDeleteId={confirmId} t={t}
-      saveError={store.error && store.error.n > baseline.current ? errorText(t, store.error.code) : null}
+      saveError={saveError && saveError.n > baseline.current ? errorText(t, saveError.code) : null}
       on={{
         back: onBack,
-        pickTheme: (id) => edit((c) => ({ ...c, settings: { ...c.settings, theme: id } })),
+        pickTheme: (id) => { setThemeError(null); edit((c) => ({ ...c, settings: { ...c.settings, theme: id } })); },
         importTheme: async () => {
           setThemeError(null);
           try {
@@ -61,9 +61,10 @@ export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBac
           setConfirmId(null);
           setThemeError(null);
           try {
+            await store.flush();
             await api.deleteTheme(id);
-            // The core falls back to the default theme when the active one is deleted; keep our copy in step.
-            if (latest()?.settings.theme === id) edit((c) => ({ ...c, settings: { ...c.settings, theme: DEFAULT_THEME } }));
+            // The core switches to the default theme itself when the active one is deleted: take its config as it is now.
+            await store.reload();
             await loadThemes();
           } catch (e) { if (alive.current) setThemeError(errorText(t, e)); }
         },
@@ -71,13 +72,14 @@ export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBac
         setGrid: (cols, rows) => {
           const cur = latest() ?? config;
           const grid = { cols, rows };
-          if (!fitsGrid(cur.pages, grid)) { setGridError(true); return; }
+          if (!fitsGrid(cur.pages, grid)) { setGridError(true); return false; }
           setGridError(false);
           commit({ ...cur, settings: { ...cur.settings, grid } });
+          return true;
         },
         clearGridError: () => setGridError(false),
-        setObs: (patch, slow) => edit((c) => ({ ...c, settings: { ...c.settings, obs: { ...c.settings.obs, ...patch } } }), slow),
-        setPort: (port) => edit((c) => ({ ...c, settings: { ...c.settings, port } }), true),
+        setObs: (patch) => edit((c) => ({ ...c, settings: { ...c.settings, obs: { ...c.settings.obs, ...patch } } })),
+        setPort: (port) => edit((c) => ({ ...c, settings: { ...c.settings, port } })),
       }}
     />
   );

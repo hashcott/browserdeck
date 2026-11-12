@@ -8,7 +8,7 @@ import { pairingView } from "./pairing";
 import "../screens.css";
 
 type T = ReturnType<typeof createT>;
-export type PairingState = { kind: "loading" } | { kind: "server_error"; text: string } | { kind: "info"; info: PairingInfo };
+export type PairingState = { kind: "loading" } | { kind: "server_error"; text: string } | { kind: "load_error"; text: string } | { kind: "info"; info: PairingInfo };
 
 export interface PairingViewProps {
   state: PairingState;
@@ -55,6 +55,14 @@ export function PairingScreen(p: PairingViewProps) {
             </section>
           )}
 
+          {p.state.kind === "load_error" && (
+            <section className="banner bad" role="alert">
+              <Icon name="alert" size={26} />
+              <p>{p.state.text}</p>
+              <button type="button" className="btn cta" onClick={p.onRetry}>{t("common.retry")}</button>
+            </section>
+          )}
+
           {view?.kind === "no_network" && (
             <section className="banner bad" role="status">
               <Icon name="alert" size={26} />
@@ -83,8 +91,9 @@ export function PairingScreen(p: PairingViewProps) {
                 )}
 
                 <div className="fld">
-                  <span className="label" id={`${id}u`}>{t("pairing.link")}</span>
-                  <code className="url" aria-labelledby={`${id}u`}>{view.url}</code>
+                  <label className="label" htmlFor={`${id}u`}>{t("pairing.link")}</label>
+                  {/* Read-only but selectable, and announced by assistive technology. */}
+                  <textarea id={`${id}u`} className="url" readOnly rows={1} value={view.url} onFocus={(e) => e.currentTarget.select()} />
                   <p className="warn"><Icon name="alert" size={18} /><span>{t("pairing.publicWifi")}</span></p>
                   <p className="note">{t("pairing.secret")}</p>
                 </div>

@@ -19,7 +19,7 @@
 .pair-side { display: grid; gap: 18px; min-width: 0; }
 .pair-side .fld { margin: 0; }
 .pair-side .note { margin: 6px 0 0; }
-.url { display: block; padding: 10px 12px; border-radius: var(--r2); background: var(--field); border: 1.5px solid var(--line); font: 600 14px/1.4 ui-monospace, "SF Mono", Consolas, monospace; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.url { display: block; width: 100%; resize: none; field-sizing: content; color: var(--ink); padding: 10px 12px; border-radius: var(--r2); background: var(--field); border: 1.5px solid var(--line); font: 600 14px/1.4 ui-monospace, "SF Mono", Consolas, monospace; overflow-wrap: anywhere; }
 .warn { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 0; padding: 10px 12px; border-radius: var(--r2); background: #f2d9a8; font-weight: 600; font-size: 14px; border: 1px solid #c9a860; }
 .warn svg { flex: none; margin-top: 2px; }
 .pair-side > .warn { margin: 0; }

@@ -159,5 +159,8 @@
   "settings.server": "Phone server",
   "settings.port": "Port",
   "settings.portNote": "Takes effect after you restart the app.",
-  "theme.fileType": "Theme file"
+  "theme.fileType": "Theme file",
+  "editor.pressFailed": "A button press from the phone failed: {reason}",
+  "editor.runtimeFailed": "Some app details could not be read, so image icons and a few hints may be missing. Restart the app if this keeps happening.",
+  "pairing.loadError": "Could not read this PC's network address."
 }

@@ -49,3 +49,16 @@ test("regenerate asks first and says the phone is disconnected", () => {
   const html = render(ready, { confirmingRegenerate: true });
   expect(html).toContain(t("pairing.regenerateConfirm"));
 });
+test("the address is a labelled read-only field, so assistive technology can read it", () => {
+  const html = render(ready);
+  expect(html).toMatch(/<textarea[^>]*readonly=""[^>]*>/);
+  expect(html).toMatch(/<label[^>]*for="([^"]+)"[^>]*>Or type this address/);
+});
+test("a failed address lookup says so with a retry, and is not the no-network state", () => {
+  qr.values.length = 0;
+  const html = render({ kind: "load_error", text: "Could not read this PC's network address." });
+  expect(html).toContain("Could not read");
+  expect(html).toContain(t("common.retry"));
+  expect(html).not.toContain(t("pairing.noNetwork"));
+  expect(qr.values).toEqual([]);
+});

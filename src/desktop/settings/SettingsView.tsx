@@ -5,7 +5,7 @@ import type { Button, Config, ObsState, Theme, ThemeInfo } from "../../shared/ty
 import { Icon, StatusDot } from "../editor/Icons";
 import { ScreenBar } from "../ScreenBar";
 import "../screens.css";
-import { NumField } from "./NumField";
+import { CommitText, NumField } from "./NumField";
 
 type T = ReturnType<typeof createT>;
 
@@ -17,10 +17,10 @@ export interface SettingsHandlers {
   deleteTheme(id: string): void;
   cancelDeleteTheme(): void;
   setLanguage(lang: string): void;
-  setGrid(cols: number, rows: number): void;
+  /** false = refused (buttons would fall outside the grid). */
+  setGrid(cols: number, rows: number): boolean;
   clearGridError(): void;
-  /** `slow` = typing: the save is debounced. */
-  setObs(patch: Partial<Config["settings"]["obs"]>, slow: boolean): void;
+  setObs(patch: Partial<Config["settings"]["obs"]>): void;
   setPort(port: number): void;
 }
 export interface SettingsViewProps {
@@ -120,8 +120,8 @@ export function SettingsScreen(p: SettingsViewProps) {
           <section className="panel" aria-labelledby={`${id}g`}>
             <h2 id={`${id}g`}>{t("settings.grid")}</h2>
             <div className="two">
-              <NumField label={t("settings.cols")} value={s.grid.cols} min={1} max={8} t={t} onCommit={(n) => on.setGrid(n, s.grid.rows)} onBlur={on.clearGridError} />
-              <NumField label={t("settings.rows")} value={s.grid.rows} min={1} max={8} t={t} onCommit={(n) => on.setGrid(s.grid.cols, n)} onBlur={on.clearGridError} />
+              <NumField label={t("settings.cols")} value={s.grid.cols} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(n, s.grid.rows)} onBlur={on.clearGridError} />
+              <NumField label={t("settings.rows")} value={s.grid.rows} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(s.grid.cols, n)} onBlur={on.clearGridError} />
             </div>
             {p.gridError && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{t("settings.gridNoFit")}</p>}
           </section>
@@ -129,19 +129,12 @@ export function SettingsScreen(p: SettingsViewProps) {
           <section className="panel" aria-labelledby={`${id}o`}>
             <h2 id={`${id}o`}>{t("settings.obs")}</h2>
             <div className="two">
-              <div className="fld">
-                <label htmlFor={`${id}h`}>{t("settings.obsHost")}</label>
-                <input id={`${id}h`} className="in" value={s.obs.host} autoComplete="off" spellCheck={false} onChange={(e) => on.setObs({ host: e.target.value }, true)} />
-              </div>
-              <NumField label={t("settings.obsPort")} value={s.obs.port} min={1} max={65535} t={t} onCommit={(n) => on.setObs({ port: n }, true)} />
+              <CommitText label={t("settings.obsHost")} value={s.obs.host} allowEmpty={false} onCommit={(host) => on.setObs({ host })} />
+              <NumField label={t("settings.obsPort")} value={s.obs.port} min={1} max={65535} t={t} onCommit={(n) => on.setObs({ port: n })} />
             </div>
-            <div className="fld">
-              <label htmlFor={`${id}p`}>{t("settings.obsPassword")}</label>
-              <div className="pw">
-                <input id={`${id}p`} className="in" type={showPw ? "text" : "password"} value={s.obs.password} autoComplete="off" spellCheck={false} onChange={(e) => on.setObs({ password: e.target.value }, true)} />
-                <button type="button" className="btn small" aria-pressed={showPw} onClick={() => setShowPw((v) => !v)}>{t(showPw ? "common.hide" : "common.show")}</button>
-              </div>
-            </div>
+            <CommitText label={t("settings.obsPassword")} value={s.obs.password} allowEmpty type={showPw ? "text" : "password"}
+              onCommit={(password) => on.setObs({ password })}
+              after={<button type="button" className="btn small" aria-pressed={showPw} onClick={() => setShowPw((v) => !v)}>{t(showPw ? "common.hide" : "common.show")}</button>} />
             <div className={`obs-state ${p.obs}`} role="status">
               <StatusDot on={p.obs === "connected"} />
               <span><b>{t("settings.obsState")}: {t(obsText)}</b>{obsHelp && <span className="note">{t(obsHelp)}</span>}</span>

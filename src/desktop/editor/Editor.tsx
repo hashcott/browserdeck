@@ -49,9 +49,15 @@ export function Editor({ store, t, onPair, onSettings }: EditorProps) {
   }, [showToast]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
-  // A rejected save or a failed action reported by the store.
-  const storeError = store.error;
-  useEffect(() => { if (storeError) showError(storeError.code); }, [storeError, showError]);
+  // A rejected save, or a button press from the phone that failed.
+  const { saveError, actionError } = store;
+  useEffect(() => { if (saveError) showError(saveError.code); }, [saveError, showError]);
+  useEffect(() => {
+    if (!actionError) return;
+    const key = `error.${String(actionError.code)}`;
+    const reason = tRef.current(key) === key ? tRef.current("error.unknown") : tRef.current(key);
+    showToast(tRef.current("editor.pressFailed", { reason }));
+  }, [actionError, showToast]);
 
   const themeId = config.settings.theme;
   useEffect(() => {
@@ -178,6 +184,7 @@ export function Editor({ store, t, onPair, onSettings }: EditorProps) {
     const key = `error.${runtime.server_error}`;
     notices.push({ id: "server", text: t(key) === key ? t("error.unknown") : t(key) });
   }
+  if (store.runtimeFailed) notices.push({ id: "runtime", text: t("editor.runtimeFailed") });
   const icons = runtime.icons_dir.replace(/[\\/]+$/, "");
 
   return (

@@ -159,5 +159,8 @@
   "settings.server": "Máy chủ cho điện thoại",
   "settings.port": "Cổng",
   "settings.portNote": "Có hiệu lực sau khi mở lại ứng dụng.",
-  "theme.fileType": "Tệp theme"
+  "theme.fileType": "Tệp theme",
+  "editor.pressFailed": "Một lần bấm nút từ điện thoại không thành công: {reason}",
+  "editor.runtimeFailed": "Không đọc được một số thông tin của ứng dụng nên biểu tượng ảnh và vài gợi ý có thể bị thiếu. Hãy mở lại ứng dụng nếu còn lặp lại.",
+  "pairing.loadError": "Không đọc được địa chỉ mạng của máy này."
 }
