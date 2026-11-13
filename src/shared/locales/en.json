@@ -28,6 +28,7 @@
   "editor.color": "Colour",
   "editor.emptySlot": "Empty slot",
   "editor.themeColor": "Theme colour",
+  "editor.presetColor": "Use {name} colour {hex}",
   "pairing.title": "Pair phone",
   "pairing.scan": "Scan this code with your phone camera.",
   "pairing.regenerate": "Make a new code",

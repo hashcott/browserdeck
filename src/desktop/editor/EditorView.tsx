@@ -7,7 +7,7 @@ import type { createT } from "../../shared/i18n";
 import { KeyFace } from "../../shared/KeyFace";
 import { themeVars } from "../../shared/theme";
 import type { ActionType, Button, Config, ObsState, Status, Theme } from "../../shared/types";
-import { ActionChip, ActionPalette } from "./ActionPalette";
+import { ACTION_TYPES, ActionChip, ActionPalette } from "./ActionPalette";
 import { Grid } from "./Grid";
 import { Icon, StatusDot } from "./Icons";
 import { Inspector, type TestResult } from "./Inspector";
@@ -168,6 +168,7 @@ export function EditorView(p: EditorViewProps) {
         </main>
 
         <Inspector button={selected} themeColor={selected ? theme.actions[selected.action.type] : "#000000"}
+          presets={ACTION_TYPES.map((type) => ({ type, color: theme.actions[type] })).filter((x) => /^#[0-9a-f]{6}$/i.test(x.color))}
           iconSrc={selected ? p.iconSrc(selected) : undefined} platform={p.platform} obs={p.status.obs} scenes={p.scenes}
           confirming={confirm?.kind === "button" && confirm.id === selected?.id} testing={p.testing} testResult={p.testResult} t={t}
           onChange={on.change} onPickImage={on.pickImage} onPickFile={on.pickFile}

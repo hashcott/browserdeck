@@ -23,6 +23,8 @@
 .warn { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 0; padding: 10px 12px; border-radius: var(--r2); background: #f2d9a8; font-weight: 600; font-size: 14px; border: 1px solid #c9a860; }
 .warn svg { flex: none; margin-top: 2px; }
 .pair-side > .warn { margin: 0; }
+.pair-side .notes { display: grid; gap: 6px; }
+.pair-side .notes .note { margin: 0; }
 .regen { padding-top: 6px; border-top: 1.5px solid var(--line); }
 .confirm-box p { margin: 14px 0 0; font-weight: 700; }
 .confirm-box .row { margin-top: 12px; }
@@ -38,17 +40,24 @@
 .inline-error { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: var(--r2); background: #f4d6cc; color: #6d1f0c; font-weight: 600; border: 1px solid #c98a78; }
 .inline-error svg { flex: none; margin-top: 2px; }
 
-/* settings */
-.panel { padding: 22px 24px 24px; border-radius: var(--r); background: var(--panel); box-shadow: 0 0 0 1.5px var(--line); min-width: 0; }
+/* settings: sections are headings on the ground, separated by a rule; theme tiles are the only cards */
+.page-inner.settings { gap: 0; }
+.panel { padding: 28px 0; border-top: 1.5px solid var(--line); min-width: 0; }
+.panel:first-of-type, .inline-error + .panel { border-top: 0; padding-top: 0; }
+.panel:last-of-type { padding-bottom: 0; }
 .panel h2 { margin: 0 0 16px; }
-.panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-.panel-head h2 { margin: 6px 0 0; }
-.panel .fld { margin-bottom: 14px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.panel-head h2 { margin: 0; }
+.panel .fld:last-child, .panel .fields:last-child { margin-bottom: 0; }
 .panel .note { margin: 6px 0 0; }
 .panel .inline-error { margin: 4px 0 12px; }
-.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.in.num { max-width: 140px; }
-.two .in.num { max-width: none; }
+.page-inner.settings > .inline-error { margin-bottom: 24px; }
+.fields { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.fields > .fld { margin: 0; }
+.fields > .fld:has(.num) { flex: none; min-width: 7em; }
+.fields > .fld:not(:has(.num)) { flex: 1 1 240px; }
+.in.num { width: 7em; max-width: 100%; font-variant-numeric: tabular-nums; }
+.fld .note.bad { width: max-content; max-width: 18em; }
 .themes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .theme-card { position: relative; display: flex; flex-direction: column; border-radius: var(--r); background: var(--field); box-shadow: 0 0 0 1.5px var(--line); min-width: 0; }
 .theme-card.on { box-shadow: 0 0 0 3px var(--ink); }
@@ -71,12 +80,11 @@
 .theme-confirm .row .btn { flex: none; }
 .pw { display: flex; gap: 8px; }
 .pw .in { flex: 1; }
-.obs-state { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r2); background: var(--field); border: 1.5px solid var(--line); }
+.obs-state { display: flex; gap: 10px; align-items: flex-start; margin-top: 4px; }
 .obs-state .dot { margin-top: 5px; color: var(--orange); }
 .obs-state .dot.on { color: var(--ok); }
 .obs-state b { display: block; font-weight: 700; }
 .obs-state .note { display: block; margin: 2px 0 0; }
-.obs-state.auth_failed, .obs-state.unsupported { border-color: var(--danger); }
 .obs-state.auth_failed .dot, .obs-state.unsupported .dot { color: var(--danger); }
 
 @media (max-width: 880px) {

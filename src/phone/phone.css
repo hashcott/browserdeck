@@ -12,7 +12,13 @@ body { -webkit-text-size-adjust: 100%; }
   color: var(--ink, #f6f1e4);
   font-family: "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-weight: 500;
+  color-scheme: var(--scheme, dark);
+  accent-color: var(--ink, #f6f1e4);
+  caret-color: var(--ink, #f6f1e4);
+  scrollbar-color: color-mix(in srgb, var(--ink, #f6f1e4) 45%, transparent) transparent;
+  --key-aspect: auto; /* phone keys stretch to fill the stage (see .deck-grid) */
 }
+.phone ::selection { background: var(--ink, #f6f1e4); color: var(--ground, #22252b); }
 
 /* Inverted ink-on-ground pair, so the text always contrasts with whatever theme is active. */
 .strip, .toast span {
@@ -23,10 +29,11 @@ body { -webkit-text-size-adjust: 100%; }
   line-height: 1.25;
 }
 .strip { flex: none; padding: 10px 16px; text-align: center; }
-.toast { flex: none; min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 12px; }
+/* The reason line floats over the bottom of the stage instead of reserving a row. */
+.toast { position: absolute; left: 0; right: 0; bottom: 12px; z-index: 2; display: flex; justify-content: center; padding: 0 12px; pointer-events: none; }
 .toast span { padding: 6px 12px; border-radius: 10px; text-align: center; max-width: 36em; }
 
-.stage { flex: 1; min-height: 0; min-width: 0; container-type: size; }
+.stage { position: relative; flex: 1; min-height: 0; min-width: 0; container-type: size; }
 .pager {
   display: flex; width: 100%; height: 100%;
   overflow-x: auto; overflow-y: hidden;
@@ -35,10 +42,12 @@ body { -webkit-text-size-adjust: 100%; }
 .pager::-webkit-scrollbar { display: none; }
 .slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; }
 
-/* Square keys: the grid is as large as fits both ways, centred. */
+/* Keys are square when the stage is short and grow taller to fill it, up to 4:5 (width:height).
+   --w is the widest grid with keys at least square; the height then stops at 4:5 keys or the stage. */
 .deck-grid {
-  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows)));
-  aspect-ratio: var(--cols) / var(--rows);
+  --w: min(100cqw, calc(100cqh * var(--cols) / var(--rows)));
+  width: var(--w);
+  height: min(100cqh, calc(var(--w) * 1.25 * var(--rows) / var(--cols)));
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
   grid-template-rows: repeat(var(--rows), 1fr);
@@ -47,6 +56,7 @@ body { -webkit-text-size-adjust: 100%; }
 .key-btn {
   all: unset;
   box-sizing: border-box;
+  display: flex;
   padding: calc(var(--key-gap, 9%) / 2);
   min-width: 0; min-height: 0;
   touch-action: manipulation;

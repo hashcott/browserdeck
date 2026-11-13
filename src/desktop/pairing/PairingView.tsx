@@ -94,12 +94,13 @@ export function PairingScreen(p: PairingViewProps) {
                   <label className="label" htmlFor={`${id}u`}>{t("pairing.link")}</label>
                   {/* Read-only but selectable, and announced by assistive technology. */}
                   <textarea id={`${id}u`} className="url" readOnly rows={1} value={view.url} onFocus={(e) => e.currentTarget.select()} />
-                  <p className="warn"><Icon name="alert" size={18} /><span>{t("pairing.publicWifi")}</span></p>
-                  <p className="note">{t("pairing.secret")}</p>
+                  <p className="warn"><Icon name="alert" size={18} /><span>{t("pairing.publicWifi")} {t("pairing.secret")}</span></p>
                 </div>
 
-                <p className="warn"><Icon name="alert" size={18} /><span>{t("pairing.firewall")}</span></p>
-                <p className="note">{t("pairing.ipChanged")}</p>
+                <div className="notes">
+                  <p className="note">{t("pairing.firewall")}</p>
+                  <p className="note">{t("pairing.ipChanged")}</p>
+                </div>
 
                 <div className="regen">
                   {p.confirmingRegenerate ? (

@@ -119,7 +119,7 @@ export function SettingsScreen(p: SettingsViewProps) {
 
           <section className="panel" aria-labelledby={`${id}g`}>
             <h2 id={`${id}g`}>{t("settings.grid")}</h2>
-            <div className="two">
+            <div className="fields">
               <NumField label={t("settings.cols")} value={s.grid.cols} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(n, s.grid.rows)} onBlur={on.clearGridError} />
               <NumField label={t("settings.rows")} value={s.grid.rows} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(s.grid.cols, n)} onBlur={on.clearGridError} />
             </div>
@@ -128,7 +128,7 @@ export function SettingsScreen(p: SettingsViewProps) {
 
           <section className="panel" aria-labelledby={`${id}o`}>
             <h2 id={`${id}o`}>{t("settings.obs")}</h2>
-            <div className="two">
+            <div className="fields">
               <CommitText label={t("settings.obsHost")} value={s.obs.host} allowEmpty={false} onCommit={(host) => on.setObs({ host })} />
               <NumField label={t("settings.obsPort")} value={s.obs.port} min={1} max={65535} t={t} onCommit={(n) => on.setObs({ port: n })} />
             </div>

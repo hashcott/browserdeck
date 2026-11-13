@@ -32,3 +32,7 @@ test("an image icon uses the caller's src, with empty alt", () => {
   const img = { ...button, icon: { kind: "image" as const, file: "a.png" } };
   expect(renderToStaticMarkup(<KeyFace button={img} theme={theme} iconSrc="/i/a.png" />)).toContain('src="/i/a.png" alt=""');
 });
+test("a light key and a dark key carry different fixed depth classes", () => {
+  expect(renderToStaticMarkup(<KeyFace button={{ ...button, color: "#f6f1e4" }} theme={theme} />)).toContain("key-light");
+  expect(renderToStaticMarkup(<KeyFace button={{ ...button, color: "#2c3a55" }} theme={theme} />)).toContain("key-dark");
+});

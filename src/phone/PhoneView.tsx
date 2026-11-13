@@ -105,6 +105,7 @@ export function PhoneView(p: PhoneViewProps) {
             ))}
           </div>
         )}
+        <div className="toast" role="status" aria-live="polite">{errorLine && <span>{errorLine}</span>}</div>
       </main>
       {pages.length > 1 && (
         <nav className="dots" aria-label={t("phone.pages")}>
@@ -120,7 +121,6 @@ export function PhoneView(p: PhoneViewProps) {
           ))}
         </nav>
       )}
-      <div className="toast" role="status" aria-live="polite">{errorLine && <span>{errorLine}</span>}</div>
     </div>
   );
 }

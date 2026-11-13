@@ -1,6 +1,6 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
-import type { Button, ObsState, VolumeOp } from "../../shared/types";
+import type { ActionType, Button, ObsState, VolumeOp } from "../../shared/types";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
 import { Icon } from "./Icons";
@@ -11,6 +11,8 @@ export interface InspectorProps {
   button: Button | null;
   /** The theme's colour for this button's action type (shown while `color` is null). */
   themeColor: string;
+  /** The active theme's four action colours, offered as presets. */
+  presets: ReadonlyArray<{ type: ActionType; color: string }>;
   iconSrc?: string;
   platform: string;
   obs: ObsState;
@@ -70,6 +72,12 @@ export function Inspector(p: InspectorProps) {
 
       <Field label={t("editor.color")}>
         <div className="color-row">
+          {p.presets.map(({ type, color }) => (
+            <button key={type} type="button" className="preset" style={{ "--c": color } as CSSProperties}
+              aria-label={t("editor.presetColor", { name: t(`action.${type}`), hex: color })}
+              aria-pressed={b.color?.toLowerCase() === color.toLowerCase()}
+              onClick={() => set({ color }, false)} />
+          ))}
           <input type="color" className="swatch" aria-label={t("editor.color")} value={b.color ?? p.themeColor}
             onChange={(e) => set({ color: e.target.value }, true)} />
           <button type="button" className="btn small" aria-pressed={b.color === null} disabled={b.color === null}

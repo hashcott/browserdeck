@@ -28,6 +28,7 @@
   "editor.color": "Màu nền",
   "editor.emptySlot": "Ô trống",
   "editor.themeColor": "Màu theo theme",
+  "editor.presetColor": "Dùng màu {name} {hex}",
   "pairing.title": "Ghép điện thoại",
   "pairing.scan": "Quét mã này bằng camera điện thoại.",
   "pairing.regenerate": "Tạo mã mới",

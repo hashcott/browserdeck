@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import "./key.css";
-import { keyColor, keyInk, themeVars } from "./theme";
+import { isLight, keyColor, pickInk, themeVars } from "./theme";
 import type { Button, Theme } from "./types";
 
 export interface KeyFaceProps {
@@ -24,12 +24,13 @@ export function KeyFace({ button, theme, iconSrc, pressed, selected, error, disa
     `depth-${k.depth}`,
     `press-${k.press}`,
     `legend-${k.legend}`,
+    isLight(bg) ? "key-light" : "key-dark",
     pressed && "is-pressed",
     selected && "is-selected",
     error && "is-error",
     disabled && "is-disabled",
   ].filter(Boolean).join(" ");
-  const style = { ...themeVars(theme), "--key-bg": bg, "--key-ink": keyInk(bg) } as CSSProperties;
+  const style = { ...themeVars(theme), "--key-bg": bg, "--key-ink": pickInk(bg, theme, 4.5) } as CSSProperties;
   const icon = button.icon;
   return (
     <div className={cls} style={style}>

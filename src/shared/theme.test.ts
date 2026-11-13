@@ -3,10 +3,11 @@ import arcadeJson from "../../themes/arcade.json";
 import flatJson from "../../themes/flat.json";
 import keycapJson from "../../themes/keycap.json";
 import stickerJson from "../../themes/sticker.json";
-import { keyColor, keyInk, themeVars } from "./theme";
+import { contrast, keyColor, keyInk, pickInk, themeVars } from "./theme";
 import type { Button, Theme } from "./types";
 
 const theme = keycapJson as Theme;
+const builtins = [keycapJson, stickerJson, arcadeJson, flatJson] as Theme[];
 const button = (over: Partial<Button>): Button => ({
   id: "b", slot: 0, label: "L", icon: { kind: "emoji", value: "x" }, color: null,
   action: { type: "volume", op: "up" }, ...over,
@@ -30,19 +31,21 @@ test("themeVars emits only custom properties", () => {
   expect(v["--c-obs_scene"]).toBe("#e8703a");
 });
 
-function contrast(a: string, b: string): number {
-  const lum = (h: string) => {
-    const n = parseInt(h.slice(1), 16);
-    const l = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * l((n >> 16) & 255) + 0.7152 * l((n >> 8) & 255) + 0.0722 * l(n & 255);
-  };
-  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
-  return (x + 0.05) / (y + 0.05);
-}
 test("--key-ring contrasts at least 3:1 with every built-in theme's ground", () => {
-  for (const t of [keycapJson, stickerJson, arcadeJson, flatJson] as Theme[]) {
+  for (const t of builtins) {
     expect(contrast(themeVars(t)["--key-ring"], t.ground), t.id).toBeGreaterThanOrEqual(3);
   }
+});
+
+test("pickInk: every built-in theme and action colour gets a legend of at least 4.5:1", () => {
+  for (const t of builtins) for (const bg of Object.values(t.actions)) {
+    expect(contrast(pickInk(bg, t, 4.5), bg), `${t.id} ${bg}`).toBeGreaterThanOrEqual(4.5);
+  }
+});
+test("pickInk prefers the theme's own ink or ground, and falls back to black or white", () => {
+  expect(pickInk("#2c3a55", theme, 4.5)).toBe("#f6f1e4");
+  expect(pickInk("#f6f1e4", theme, 4.5)).toBe("#22252b");
+  expect(pickInk("#6f7d4f", theme, 4.5)).toBe(keyInk("#6f7d4f"));
 });
 test("themeVars falls back to safe values for hostile input", () => {
   const evil = {
