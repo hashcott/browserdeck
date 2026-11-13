@@ -22,6 +22,24 @@ export interface SettingsHandlers {
   clearGridError(): void;
   setObs(patch: Partial<Config["settings"]["obs"]>): void;
   setPort(port: number): void;
+  /** Opens the confirmation; administrator mode is only turned on from there. */
+  askAdmin(): void;
+  cancelAdmin(): void;
+  setAdmin(enabled: boolean): void;
+  setAutostart(enabled: boolean): void;
+}
+/** The Windows section's state. */
+export interface WindowsSection {
+  /** This process runs as administrator (it stays so until restarted, even with the mode turned off). */
+  elevated: boolean;
+  confirmAdmin: boolean;
+  /** A switch's command is running. */
+  busy: boolean;
+  error: string | null;
+  /** Why administrator mode is on but not active, when known. */
+  adminInactiveReason: string | null;
+  /** The last start-with-Windows registration failed. */
+  autostartError: string | null;
 }
 export interface SettingsViewProps {
   config: Config;
@@ -32,6 +50,8 @@ export interface SettingsViewProps {
   themeError: string | null;
   saveError: string | null;
   confirmDeleteId: string | null;
+  /** null hides the Windows section (other systems). */
+  windows: WindowsSection | null;
   t: T;
   on: SettingsHandlers;
 }
@@ -56,6 +76,7 @@ export function SettingsScreen(p: SettingsViewProps) {
   const id = useId();
   const [showPw, setShowPw] = useState(false);
   const [obsText, obsHelp] = OBS_TEXT[p.obs];
+  const w = p.windows;
 
   return (
     <div className="screen">
@@ -147,7 +168,43 @@ export function SettingsScreen(p: SettingsViewProps) {
             <p className="note">{t("settings.portNote")}</p>
           </section>
 
-          {/* Task 11 adds the administrator-mode and start-with-Windows sections here, after the server port. */}
+          {w && (
+            <section className="panel" aria-labelledby={`${id}w`}>
+              <h2 id={`${id}w`}>{t("settings.windows")}</h2>
+              {w.error && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{w.error}</p>}
+              <div className="opts">
+                <div>
+                  <label className="switch">
+                    <input type="checkbox" role="switch" checked={s.run_as_admin} disabled={w.busy || w.confirmAdmin}
+                      onChange={(e) => (e.target.checked ? on.askAdmin() : on.setAdmin(false))} />
+                    <span>{t("settings.runAsAdmin")}</span>
+                  </label>
+                  {w.elevated && !s.run_as_admin && <p className="note">{t("settings.adminOffAfterRestart")}</p>}
+                  {!w.elevated && s.run_as_admin && (
+                    <p className="note bad">{w.adminInactiveReason ? `${t("settings.adminInactive")} ${w.adminInactiveReason}` : t("settings.adminInactive")}</p>
+                  )}
+                  <p className="note">{t("settings.gamesLimit")}</p>
+                  {w.confirmAdmin && (
+                    <div className="confirm-box" role="group" aria-label={t("settings.runAsAdmin")}>
+                      <p className="warn"><Icon name="alert" size={18} /><span>{t("settings.adminWarning")} {t("settings.adminRisk")}</span></p>
+                      <div className="row">
+                        <button type="button" className="btn danger" onClick={() => on.setAdmin(true)} autoFocus>{t("settings.adminTurnOn")}</button>
+                        <button type="button" className="btn" onClick={on.cancelAdmin}>{t("common.cancel")}</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="switch">
+                    <input type="checkbox" role="switch" checked={s.autostart} disabled={w.busy}
+                      onChange={(e) => on.setAutostart(e.target.checked)} />
+                    <span>{t("settings.autostart")}</span>
+                  </label>
+                  {w.autostartError && <p className="note bad">{w.autostartError}</p>}
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </main>
     </div>

@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod auth;
+pub mod autostart;
 pub mod commands;
 pub mod config;
 pub mod elevation;
@@ -8,7 +9,9 @@ pub mod net;
 pub mod server;
 pub mod state;
 mod themes;
+pub mod tray;
 
+use commands::SystemSettingError;
 use state::{AppState, CoreEvent, EventSink};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -35,12 +38,21 @@ fn build_state(app: &tauri::App) -> Result<Arc<AppState>, Box<dyn std::error::Er
         }
     };
     let preferred_port = cfg.settings.port;
+    let (autostart, run_as_admin) = (cfg.settings.autostart, cfg.settings.run_as_admin);
     let events = Arc::new(TauriSink(app.handle().clone()));
     // Inside the runtime: AppState::new spawns the OBS task.
     tauri::async_runtime::block_on(async move {
         let mut state = AppState::new(dir, cfg, events, |obs| Arc::new(actions::SystemExecutor { obs }));
         state.startup.first_run = first_run;
         state.startup.recovered_backup = recovered_backup;
+        state.startup.admin_error = app.try_state::<AdminInactive>().map(|a| a.0);
+        // Keep the start-with-Windows entry in step with the settings, e.g. switch to the elevated task once
+        // administrator mode has relaunched the app. Not while administrator mode is on but this process is not
+        // elevated: the task cannot be created then. Before the window shows, so Settings sees the outcome.
+        if cfg!(windows) && (elevation::self_elevated() || !run_as_admin) {
+            *state.autostart_error.get_mut().unwrap_or_else(|e| e.into_inner()) =
+                autostart::apply(app.handle(), autostart, run_as_admin).err();
+        }
         let bound = server::bind(preferred_port).await;
         match &bound {
             Ok((_, port)) => state.port.store(*port, Ordering::Relaxed),
@@ -57,21 +69,66 @@ fn build_state(app: &tauri::App) -> Result<Arc<AppState>, Box<dyn std::error::Er
     })
 }
 
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
+fn args() -> Vec<String> {
+    std::env::args_os().map(|a| a.to_string_lossy().into_owned()).collect()
+}
+
+/// Why administrator mode is on but this process runs unelevated.
+struct AdminInactive(SystemSettingError);
+
+/// Registered before the single-instance plugin, so the startup relaunch happens while this process holds neither
+/// the instance lock nor the phone port, and a copy started by `set_admin_mode` first waits for its predecessor to
+/// let go of both.
+fn startup_gate() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::new("startup-gate")
+        .setup(|app, _| {
+            let args = args();
+            if let Some(pid) = elevation::wait_pid(&args) {
+                elevation::wait_for_exit(pid);
             }
-        }))
-        .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
-            let state = build_state(app)?;
-            app.manage(state);
+            let run_as_admin = app.path().app_data_dir().is_ok_and(|dir| config::peek_run_as_admin(&dir));
+            if elevation::should_relaunch(run_as_admin, elevation::self_elevated(), &args) {
+                // Never elevate an exe a standard user can replace. A refused UAC prompt (or any failure) also keeps
+                // this process running unelevated; Settings says why.
+                let reason = if !elevation::machine_install() {
+                    SystemSettingError::NeedsMachineInstall
+                } else {
+                    let mut extra = vec![elevation::ELEVATED_CHILD_ARG];
+                    if args.iter().any(|a| a == autostart::HIDDEN_ARG) {
+                        extra.push(autostart::HIDDEN_ARG);
+                    }
+                    if elevation::relaunch_elevated(&extra).is_ok() {
+                        std::process::exit(0); // nothing is held yet: no lock, no port, no window
+                    }
+                    SystemSettingError::UacDeclined
+                };
+                app.manage(AdminInactive(reason));
+            }
             Ok(())
         })
+        .build()
+}
+
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(startup_gate())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![autostart::HIDDEN_ARG]),
+        ))
+        .setup(|app| {
+            let state = build_state(app)?;
+            let language = state.config.blocking_read().settings.language.clone();
+            app.manage(state);
+            tray::create(app.handle(), &language)?;
+            if !args().iter().any(|a| a == autostart::HIDDEN_ARG) {
+                tray::show_window(app.handle());
+            }
+            Ok(())
+        })
+        .on_window_event(tray::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::save_config,
@@ -86,6 +143,8 @@ pub fn run() {
             commands::import_theme,
             commands::delete_theme,
             commands::get_status,
+            commands::set_admin_mode,
+            commands::set_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

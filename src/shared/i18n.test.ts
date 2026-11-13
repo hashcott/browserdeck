@@ -45,6 +45,7 @@ test("ALL_ERROR_CODES covers every error variant in the Rust enums", () => {
     ...variants(configRs, "ConfigError"),
     ...variants(themesRs, "ThemeError"),
     ...variants(commandsRs, "IconError"),
+    ...variants(commandsRs, "SystemSettingError"),
   ];
   expect(rust.length).toBeGreaterThan(20);
   expect(rust.filter((c) => !ALL_ERROR_CODES.includes(c))).toEqual([]);

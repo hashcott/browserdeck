@@ -2,7 +2,7 @@
 //! the `#[tauri::command]` wrappers only delegate. Errors are serde snake_case codes, never text.
 
 use crate::actions::{self, ActionError};
-use crate::config::{self, Config, ConfigError, SCHEMA_VERSION};
+use crate::config::{self, Config, ConfigError, Settings, SCHEMA_VERSION};
 use crate::hub::layout_msg;
 use crate::net;
 use crate::state::{AppState, ObsState};
@@ -12,7 +12,7 @@ use std::net::Ipv4Addr;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 pub const MAX_ICON_BYTES: u64 = 1024 * 1024;
 
@@ -27,6 +27,10 @@ pub struct Runtime {
     pub platform: String,
     /// Short code when the phone server could not bind any port.
     pub server_error: Option<String>,
+    /// The last attempt to register start-with-Windows failed (at startup or from Settings).
+    pub autostart_error: Option<SystemSettingError>,
+    /// Why administrator mode is on but the app is not elevated, when known.
+    pub admin_error: Option<SystemSettingError>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -56,6 +60,19 @@ pub enum IconError {
     Io,
 }
 
+/// Errors of the administrator-mode and start-with-Windows commands.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemSettingError {
+    SaveFailed,
+    /// The UAC prompt was refused, or the elevated copy could not be started.
+    UacDeclined,
+    UnsupportedPlatform,
+    AutostartFailed,
+    /// Administrator mode needs the app installed for all users, in Program Files.
+    NeedsMachineInstall,
+}
+
 pub fn runtime(state: &AppState) -> Runtime {
     Runtime {
         port: state.port.load(Ordering::Relaxed),
@@ -65,17 +82,23 @@ pub fn runtime(state: &AppState) -> Runtime {
         recovered_backup: state.startup.recovered_backup.clone(),
         platform: std::env::consts::OS.to_string(),
         server_error: state.startup.server_error.map(str::to_string),
+        autostart_error: *state.autostart_error.lock().unwrap_or_else(|e| e.into_inner()),
+        admin_error: state.startup.admin_error,
     }
 }
 
-/// Validates, persists, swaps in, then tells the phone and the OBS task. The token is never taken from `config`.
+/// Validates, persists, swaps in, then tells the phone and the OBS task. The token and the settings only their own
+/// commands change (administrator mode, start with Windows, tray notice) are never taken from `config`: a desktop
+/// save sends a whole config that may predate those commands.
 pub async fn apply_config(state: &AppState, mut config: Config) -> Result<(), ConfigError> {
     config.validate()?;
     config.schema_version = SCHEMA_VERSION;
     {
         // Held across the write so concurrent saves (and token changes) cannot interleave file and memory.
         let mut cur = state.config.write().await;
-        config.settings.token = cur.settings.token.clone();
+        let (next, now) = (&mut config.settings, &cur.settings);
+        next.token = now.token.clone();
+        (next.run_as_admin, next.autostart, next.tray_notice_shown) = (now.run_as_admin, now.autostart, now.tray_notice_shown);
         config::save(&state.data_dir, &config).map_err(|_| ConfigError::SaveFailed)?;
         *cur = config;
         // Inside the lock so the channel always ends at the last saved value. Only a real change
@@ -93,14 +116,68 @@ pub async fn apply_config(state: &AppState, mut config: Config) -> Result<(), Co
     Ok(())
 }
 
-pub async fn regenerate(state: &AppState) -> Result<PairingInfo, ConfigError> {
-    {
-        let mut cur = state.config.write().await;
-        let mut next = cur.clone();
-        next.settings.token = crate::auth::new_token();
-        config::save(&state.data_dir, &next).map_err(|_| ConfigError::SaveFailed)?;
-        *cur = next;
+/// Changes core-owned settings (see `apply_config`) under the config lock. Nothing the phone shows depends on them.
+pub async fn update_settings(state: &AppState, f: impl FnOnce(&mut Settings)) -> Result<(), ConfigError> {
+    let mut cur = state.config.write().await;
+    let mut next = cur.clone();
+    f(&mut next.settings);
+    config::save(&state.data_dir, &next).map_err(|_| ConfigError::SaveFailed)?;
+    *cur = next;
+    Ok(())
+}
+
+fn saved(r: Result<(), ConfigError>) -> Result<(), SystemSettingError> {
+    r.map_err(|_| SystemSettingError::SaveFailed)
+}
+
+/// Keeps how an attempt to register start-with-Windows ended, for `Runtime`.
+fn applied(state: &AppState, r: Result<(), SystemSettingError>) -> Result<(), SystemSettingError> {
+    *state.autostart_error.lock().unwrap_or_else(|e| e.into_inner()) = r.err();
+    r
+}
+
+/// Turning administrator mode on needs a machine install (otherwise nothing is saved). The setting is saved first.
+/// Turning it on unelevated starts an elevated copy through `relaunch` (UAC) and returns Ok(true): the caller must
+/// exit. A refused prompt saves `false` again. Otherwise (already elevated, or turning it off) the start-with-Windows
+/// entry switches now via `apply_autostart(autostart, run_as_admin)`; turning it off leaves this process elevated
+/// until the app is opened again.
+pub async fn admin_mode(
+    state: &AppState,
+    enabled: bool,
+    elevated: bool,
+    machine_install: bool,
+    relaunch: impl FnOnce() -> std::io::Result<()>,
+    apply_autostart: impl FnOnce(bool, bool) -> Result<(), SystemSettingError>,
+) -> Result<bool, SystemSettingError> {
+    if enabled && !machine_install {
+        return Err(SystemSettingError::NeedsMachineInstall);
     }
+    saved(update_settings(state, |s| s.run_as_admin = enabled).await)?;
+    if enabled && !elevated {
+        if relaunch().is_ok() {
+            return Ok(true);
+        }
+        saved(update_settings(state, |s| s.run_as_admin = false).await)?;
+        return Err(SystemSettingError::UacDeclined);
+    }
+    let autostart = state.config.read().await.settings.autostart;
+    applied(state, apply_autostart(autostart, enabled))?;
+    Ok(false)
+}
+
+/// Registers (or removes) the start-with-Windows entry first, and saves the setting only once that worked.
+pub async fn autostart_setting(
+    state: &AppState,
+    enabled: bool,
+    apply_autostart: impl FnOnce(bool, bool) -> Result<(), SystemSettingError>,
+) -> Result<(), SystemSettingError> {
+    let run_as_admin = state.config.read().await.settings.run_as_admin;
+    applied(state, apply_autostart(enabled, run_as_admin))?;
+    saved(update_settings(state, |s| s.autostart = enabled).await)
+}
+
+pub async fn regenerate(state: &AppState) -> Result<PairingInfo, ConfigError> {
+    update_settings(state, |s| s.token = crate::auth::new_token()).await?;
     state.hub.kick().await;
     Ok(pairing(state).await)
 }
@@ -194,8 +271,14 @@ pub async fn get_config(state: St<'_>) -> Result<Config, ()> {
 }
 
 #[tauri::command]
-pub async fn save_config(state: St<'_>, config: Config) -> Result<(), ConfigError> {
-    apply_config(&state, config).await
+pub async fn save_config(app: AppHandle, state: St<'_>, config: Config) -> Result<(), ConfigError> {
+    let language = config.settings.language.clone();
+    let relabel = state.config.read().await.settings.language != language;
+    apply_config(&state, config).await?;
+    if relabel {
+        crate::tray::relabel(&app, &language);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -251,6 +334,34 @@ pub async fn delete_theme(state: St<'_>, id: String) -> Result<(), ThemeError> {
 #[tauri::command]
 pub async fn get_status(state: St<'_>) -> Result<Status, ()> {
     Ok(status(&state).await)
+}
+
+/// SECURITY: with administrator mode on, the elevated app runs whatever `path` + `args` the buttons in
+/// config.json name, and config.json lives in the user's own, user-writable app data folder. So any program
+/// running as this user can rewrite a button and have it run as administrator, which is a way to gain admin
+/// rights without a UAC prompt. The pairing token sits in the same file, so such a program need not even wait for
+/// someone to press the button: it can press it itself over the phone server. Not addressed here (no ACL changes,
+/// no de-elevated launch); see the Task 11 report. (The exe itself is covered: administrator mode requires a
+/// machine install, see `elevation::machine_install`.)
+#[tauri::command]
+pub async fn set_admin_mode(app: AppHandle, state: St<'_>, enabled: bool) -> Result<(), SystemSettingError> {
+    if !cfg!(windows) {
+        return Err(SystemSettingError::UnsupportedPlatform);
+    }
+    // The elevated copy waits for this process to end, so it gets the phone port and the single-instance lock.
+    let wait = format!("{}{}", crate::elevation::WAIT_PID_ARG, std::process::id());
+    let relaunch = || crate::elevation::relaunch_elevated(&[&wait]);
+    let apply = |on, admin| crate::autostart::apply(&app, on, admin);
+    let (elevated, machine) = (crate::elevation::self_elevated(), crate::elevation::machine_install());
+    if admin_mode(&state, enabled, elevated, machine, relaunch, apply).await? {
+        app.exit(0);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_autostart(app: AppHandle, state: St<'_>, enabled: bool) -> Result<(), SystemSettingError> {
+    autostart_setting(&state, enabled, |on, admin| crate::autostart::apply(&app, on, admin)).await
 }
 
 #[cfg(test)]
@@ -547,5 +658,113 @@ mod tests {
         assert_eq!(status(&f.state).await, Status { phone_connected: false, obs: ObsState::Disconnected });
         let _ = f.state.hub.attach().await;
         assert!(status(&f.state).await.phone_connected);
+    }
+
+    #[tokio::test]
+    async fn save_config_cannot_change_core_owned_settings() {
+        let f = fixture(Ok(()));
+        let mut c = cfg(&f).await;
+        c.settings.run_as_admin = true;
+        c.settings.autostart = true;
+        c.settings.tray_notice_shown = true;
+        c.settings.language = "vi".into();
+        apply_config(&f.state, c).await.unwrap();
+        let s = cfg(&f).await.settings;
+        assert_eq!((s.run_as_admin, s.autostart, s.tray_notice_shown), (false, false, false));
+        assert_eq!(s.language, "vi");
+        update_settings(&f.state, |s| s.tray_notice_shown = true).await.unwrap();
+        apply_config(&f.state, cfg(&f).await).await.unwrap();
+        assert!(cfg(&f).await.settings.tray_notice_shown);
+        assert!(on_disk(&f).contains("\"tray_notice_shown\": true"));
+    }
+
+    type Applied = Result<(), SystemSettingError>;
+
+    fn never_apply(_: bool, _: bool) -> Applied {
+        panic!("autostart must not be touched here")
+    }
+
+    #[tokio::test]
+    async fn admin_mode_on_saves_before_relaunching_then_asks_to_exit() {
+        let f = fixture(Ok(()));
+        let disk = f.state.data_dir.clone();
+        let relaunch = || {
+            let saved = std::fs::read_to_string(disk.join("config.json")).unwrap();
+            assert!(saved.contains("\"run_as_admin\": true"), "saved before the relaunch");
+            Ok(())
+        };
+        assert_eq!(admin_mode(&f.state, true, false, true, relaunch, never_apply).await, Ok(true));
+        assert!(cfg(&f).await.settings.run_as_admin);
+    }
+
+    #[tokio::test]
+    async fn admin_mode_needs_a_machine_install_and_then_changes_nothing() {
+        let f = fixture(Ok(()));
+        let before = on_disk(&f);
+        let no_relaunch = || -> std::io::Result<()> { panic!("no relaunch without a machine install") };
+        for elevated in [false, true] {
+            let r = admin_mode(&f.state, true, elevated, false, no_relaunch, never_apply).await;
+            assert_eq!(r, Err(SystemSettingError::NeedsMachineInstall));
+        }
+        assert!(!cfg(&f).await.settings.run_as_admin);
+        assert_eq!(on_disk(&f), before);
+        // turning it off is always allowed
+        let off = admin_mode(&f.state, false, false, false, no_relaunch, |_, _| Ok(())).await;
+        assert_eq!(off, Ok(false));
+    }
+
+    #[tokio::test]
+    async fn admin_mode_declined_reverts_and_reports() {
+        let f = fixture(Ok(()));
+        let declined = || Err(std::io::Error::from_raw_os_error(1223)); // ERROR_CANCELLED
+        assert_eq!(admin_mode(&f.state, true, false, true, declined, never_apply).await, Err(SystemSettingError::UacDeclined));
+        assert!(!cfg(&f).await.settings.run_as_admin);
+        assert!(on_disk(&f).contains("\"run_as_admin\": false"));
+    }
+
+    #[tokio::test]
+    async fn admin_mode_without_relaunch_reapplies_autostart() {
+        let f = fixture(Ok(()));
+        update_settings(&f.state, |s| s.autostart = true).await.unwrap();
+        let no_relaunch = || -> std::io::Result<()> { panic!("already elevated or turning off: no relaunch") };
+        let applied = std::sync::Mutex::new(vec![]);
+        let apply = |a, r| { applied.lock().unwrap().push((a, r)); Ok(()) };
+        assert_eq!(admin_mode(&f.state, true, true, true, no_relaunch, apply).await, Ok(false));
+        assert!(cfg(&f).await.settings.run_as_admin);
+        assert_eq!(admin_mode(&f.state, false, true, true, no_relaunch, apply).await, Ok(false));
+        assert!(!cfg(&f).await.settings.run_as_admin);
+        assert_eq!(*applied.lock().unwrap(), [(true, true), (true, false)]);
+        let failing = |_, _| Err(SystemSettingError::AutostartFailed);
+        assert_eq!(admin_mode(&f.state, false, true, true, no_relaunch, failing).await, Err(SystemSettingError::AutostartFailed));
+        assert_eq!(runtime(&f.state).autostart_error, Some(SystemSettingError::AutostartFailed));
+    }
+
+    #[tokio::test]
+    async fn autostart_applies_first_saves_only_on_success_and_keeps_the_outcome_for_runtime() {
+        let f = fixture(Ok(()));
+        update_settings(&f.state, |s| s.run_as_admin = true).await.unwrap();
+        assert_eq!(runtime(&f.state).autostart_error, None);
+        let failing = |_, _| Err(SystemSettingError::AutostartFailed);
+        assert_eq!(autostart_setting(&f.state, true, failing).await, Err(SystemSettingError::AutostartFailed));
+        assert_eq!(runtime(&f.state).autostart_error, Some(SystemSettingError::AutostartFailed));
+        let not_here = |_, _| Err(SystemSettingError::NeedsMachineInstall);
+        assert_eq!(autostart_setting(&f.state, true, not_here).await, Err(SystemSettingError::NeedsMachineInstall));
+        assert!(!cfg(&f).await.settings.autostart);
+        let seen = std::sync::Mutex::new(None);
+        autostart_setting(&f.state, true, |a, r| { *seen.lock().unwrap() = Some((a, r)); Ok(()) }).await.unwrap();
+        assert_eq!(*seen.lock().unwrap(), Some((true, true)));
+        assert!(cfg(&f).await.settings.autostart);
+        assert!(on_disk(&f).contains("\"autostart\": true"));
+        assert_eq!(runtime(&f.state).autostart_error, None);
+    }
+
+    #[tokio::test]
+    async fn system_settings_report_save_failure() {
+        let f = fixture(Ok(()));
+        break_saving(&f);
+        assert_eq!(autostart_setting(&f.state, true, |_, _| Ok(())).await, Err(SystemSettingError::SaveFailed));
+        assert_eq!(admin_mode(&f.state, true, false, true, || Ok(()), never_apply).await, Err(SystemSettingError::SaveFailed));
+        let s = cfg(&f).await.settings;
+        assert!(!s.autostart && !s.run_as_admin);
     }
 }

@@ -226,6 +226,15 @@ pub fn save(dir: &Path, config: &Config) -> io::Result<()> {
     std::fs::rename(&tmp, dir.join(FILE))
 }
 
+/// `run_as_admin` as `load_or_init` would load it, without creating or repairing anything: false whenever the
+/// file would not load as it is.
+pub fn peek_run_as_admin(dir: &Path) -> bool {
+    std::fs::read(dir.join(FILE))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Config>(&bytes).ok())
+        .is_some_and(|c| c.schema_version == SCHEMA_VERSION && c.validate().is_ok() && c.settings.run_as_admin)
+}
+
 pub fn load_or_init(dir: &Path) -> io::Result<LoadOutcome> {
     let path = dir.join(FILE);
     let text = match std::fs::read_to_string(&path) {
@@ -383,6 +392,22 @@ mod tests {
         c.pages.clear();
         save(d.path(), &c).unwrap();
         assert!(matches!(load_or_init(d.path()).unwrap(), LoadOutcome::Recovered { .. }));
+    }
+
+    #[test]
+    fn peek_run_as_admin_only_trusts_a_config_that_would_load() {
+        let d = tempfile::tempdir().unwrap();
+        assert!(!peek_run_as_admin(d.path()));
+        let mut c = cfg();
+        c.settings.run_as_admin = true;
+        save(d.path(), &c).unwrap();
+        assert!(peek_run_as_admin(d.path()));
+        c.settings.grid.cols = 0;
+        save(d.path(), &c).unwrap();
+        assert!(!peek_run_as_admin(d.path()));
+        std::fs::write(d.path().join(FILE), "{").unwrap();
+        assert!(!peek_run_as_admin(d.path()));
+        assert!(!d.path().join("config.json.tmp").exists() && std::fs::read_dir(d.path()).unwrap().count() == 1);
     }
 
     #[test]

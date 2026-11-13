@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  ActionError, Config, ConfigError, CoreEvent, IconError, PairingInfo, Runtime, Status, Theme,
+  ActionError, Config, ConfigError, CoreEvent, IconError, PairingInfo, Runtime, Status, SystemSettingError, Theme,
   ThemeError, ThemeInfo,
 } from "../shared/types";
 
@@ -29,9 +29,14 @@ export const importTheme = (path: string) => invoke<ThemeInfo>("import_theme", {
 /** Rejects with a ThemeError code. */
 export const deleteTheme = (id: string) => invoke<void>("delete_theme", { id });
 export const getStatus = () => invoke<Status>("get_status");
+/** Saves administrator mode. Turning it on unelevated restarts the app through UAC (this process exits, so the
+ *  promise never settles). Rejects with a SystemSettingError code. */
+export const setAdminMode = (enabled: boolean) => invoke<void>("set_admin_mode", { enabled });
+/** Registers or removes start-with-Windows, then saves it. Rejects with a SystemSettingError code. */
+export const setAutostart = (enabled: boolean) => invoke<void>("set_autostart", { enabled });
 
 /** Subscribes to core events; resolves with the unsubscribe function. */
 export const onCoreEvent = (cb: (e: CoreEvent) => void): Promise<() => void> =>
   listen<CoreEvent>("core-event", (e) => cb(e.payload));
 
-export type { ActionError, ConfigError, IconError, ThemeError };
+export type { ActionError, ConfigError, IconError, SystemSettingError, ThemeError };

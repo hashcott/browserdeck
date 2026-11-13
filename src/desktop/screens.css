@@ -86,6 +86,17 @@
 .obs-state b { display: block; font-weight: 700; }
 .obs-state .note { display: block; margin: 2px 0 0; }
 .obs-state.auth_failed .dot, .obs-state.unsupported .dot { color: var(--danger); }
+.opts { display: grid; gap: 24px; }
+/* a real checkbox (role="switch") drawn as a track and knob; checked takes the ink of the selected segment */
+.switch { display: flex; align-items: center; gap: 12px; width: max-content; max-width: 100%; font-weight: 700; cursor: pointer; }
+.switch input { appearance: none; flex: none; position: relative; width: 44px; height: 26px; margin: 0; border-radius: 13px; background: var(--line); cursor: pointer; transition: background 0.15s; }
+.switch input::before { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--field); box-shadow: 0 1px 2px #22252b55; transition: transform 0.15s; }
+.switch input:checked { background: var(--ink); }
+.switch input:checked::before { transform: translateX(18px); }
+.switch:has(input:disabled) { cursor: default; opacity: 0.55; }
+.switch input:disabled { cursor: default; }
+.switch ~ .note, .switch ~ .confirm-box { margin-left: 56px; }
+@media (prefers-reduced-motion: reduce) { .switch input, .switch input::before { transition: none; } }
 
 @media (max-width: 880px) {
   .pair-cols { grid-template-columns: minmax(0, 1fr); }

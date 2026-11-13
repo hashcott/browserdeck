@@ -163,5 +163,15 @@
   "theme.fileType": "Tệp theme",
   "editor.pressFailed": "Một lần bấm nút từ điện thoại không thành công: {reason}",
   "editor.runtimeFailed": "Không đọc được một số thông tin của ứng dụng nên biểu tượng ảnh và vài gợi ý có thể bị thiếu. Hãy mở lại ứng dụng nếu còn lặp lại.",
-  "pairing.loadError": "Không đọc được địa chỉ mạng của máy này."
+  "pairing.loadError": "Không đọc được địa chỉ mạng của máy này.",
+  "settings.windows": "Windows",
+  "settings.runAsAdmin": "Chạy với quyền quản trị",
+  "settings.adminRisk": "Mọi chương trình trên máy này đều đổi được việc các nút làm, nên khi bật quyền quản trị, chúng có thể dùng app này để giành quyền quản trị.",
+  "settings.adminTurnOn": "Bật",
+  "settings.adminOffAfterRestart": "Quyền quản trị sẽ tắt khi bạn mở lại app.",
+  "settings.autostart": "Khởi động cùng Windows",
+  "error.uac_declined": "Không được cấp quyền quản trị.",
+  "error.autostart_failed": "Không đổi được chế độ khởi động cùng Windows.",
+  "settings.adminInactive": "Chế độ quản trị đang bật nhưng lúc này app không chạy với quyền quản trị.",
+  "error.needs_machine_install": "Chế độ quản trị cần Browserdeck được cài cho mọi người dùng, trong Program Files. Hãy cài lại và chọn \"cho mọi người dùng\"."
 }

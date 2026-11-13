@@ -1,5 +1,6 @@
 use crate::actions::{ActionError, Executor};
 use crate::actions::obs::ObsClient;
+use crate::commands::SystemSettingError;
 use crate::config::{Config, ObsSettings};
 use crate::hub::Hub;
 use serde::Serialize;
@@ -45,6 +46,8 @@ pub struct AppState {
     /// Must live as long as the app: the OBS task ends when it is dropped.
     pub obs_settings: watch::Sender<ObsSettings>,
     pub startup: Startup,
+    /// How the last attempt to register start-with-Windows ended (at startup or from Settings).
+    pub autostart_error: std::sync::Mutex<Option<SystemSettingError>>,
 }
 
 /// What happened while starting up; read-only afterwards.
@@ -54,6 +57,8 @@ pub struct Startup {
     pub recovered_backup: Option<String>,
     /// Short code, set when no port could be bound.
     pub server_error: Option<&'static str>,
+    /// Why administrator mode is on but this process is not elevated, when known.
+    pub admin_error: Option<SystemSettingError>,
 }
 
 impl AppState {
@@ -76,6 +81,7 @@ impl AppState {
             obs,
             obs_settings,
             startup: Startup::default(),
+            autostart_error: std::sync::Mutex::new(None),
         }
     }
 }

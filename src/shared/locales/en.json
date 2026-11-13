@@ -163,5 +163,15 @@
   "theme.fileType": "Theme file",
   "editor.pressFailed": "A button press from the phone failed: {reason}",
   "editor.runtimeFailed": "Some app details could not be read, so image icons and a few hints may be missing. Restart the app if this keeps happening.",
-  "pairing.loadError": "Could not read this PC's network address."
+  "pairing.loadError": "Could not read this PC's network address.",
+  "settings.windows": "Windows",
+  "settings.runAsAdmin": "Run as administrator",
+  "settings.adminRisk": "Any program on this PC can change what the buttons do, so with administrator mode on it could use this app to gain administrator rights.",
+  "settings.adminTurnOn": "Turn on",
+  "settings.adminOffAfterRestart": "Administrator mode turns off once you restart the app.",
+  "settings.autostart": "Start with Windows",
+  "error.uac_declined": "Administrator rights were not granted.",
+  "error.autostart_failed": "Start with Windows could not be changed.",
+  "settings.adminInactive": "Administrator mode is on, but the app is not running as administrator right now.",
+  "error.needs_machine_install": "Administrator mode needs Browserdeck installed for all users, in Program Files. Reinstall it and choose \"for all users\"."
 }

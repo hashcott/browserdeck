@@ -7,7 +7,7 @@ import { createConfigCore } from "./configCore";
 export interface StoreError { code: unknown; n: number }
 
 /** Stands in when get_runtime fails, so a config that did load is still usable. */
-const NO_RUNTIME: Runtime = { port: 0, icons_dir: "", elevated: false, first_run: false, recovered_backup: null, platform: "", server_error: null };
+const NO_RUNTIME: Runtime = { port: 0, icons_dir: "", elevated: false, first_run: false, recovered_backup: null, platform: "", server_error: null, autostart_error: null, admin_error: null };
 
 /** The one owner of the config: every view reads it here and writes it through `commit`, so all saves share one
  *  serialised queue and one rollback-on-rejection path (see configCore). Also owns the live phone/OBS status.
@@ -65,6 +65,8 @@ export function useConfigStore() {
     commit: core.commit, flush: core.flush, latest: core.latest,
     /** Re-reads the config from the core, for when the core changed it itself. Flushes pending saves first, and never overwrites a newer edit. */
     reload: () => core.reload(api.getConfig),
+    /** Re-reads the runtime, for facts a command changed (e.g. the start-with-Windows outcome). */
+    refreshRuntime: () => api.getRuntime().then((rt) => { setRuntime(rt); setRuntimeFailed(false); }),
   };
 }
 export type ConfigStore = ReturnType<typeof useConfigStore>;

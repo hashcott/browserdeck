@@ -106,15 +106,19 @@ export const THEME_ERRORS = [
   "builtin_id", "not_found", "io",
 ] as const;
 export const ICON_ERRORS = ["too_large", "bad_type", "io"] as const;
+export const SYSTEM_SETTING_ERRORS = [
+  "save_failed", "uac_declined", "unsupported_platform", "autostart_failed", "needs_machine_install",
+] as const;
 
 export type ActionError = (typeof ACTION_ERRORS)[number];
 export type ConfigError = (typeof CONFIG_ERRORS)[number];
 export type ThemeError = (typeof THEME_ERRORS)[number];
 export type IconError = (typeof ICON_ERRORS)[number];
+export type SystemSettingError = (typeof SYSTEM_SETTING_ERRORS)[number];
 
 /** Every error code the core can return, deduplicated. Each has an `error.<code>` message. */
 export const ALL_ERROR_CODES: readonly string[] = [
-  ...new Set<string>([...ACTION_ERRORS, ...CONFIG_ERRORS, ...THEME_ERRORS, ...ICON_ERRORS]),
+  ...new Set<string>([...ACTION_ERRORS, ...CONFIG_ERRORS, ...THEME_ERRORS, ...ICON_ERRORS, ...SYSTEM_SETTING_ERRORS]),
 ];
 
 // Phone WebSocket protocol (hub.rs)
@@ -141,6 +145,10 @@ export interface Runtime {
   platform: string;
   /** Short code (e.g. "bind_failed") when the phone server could not bind any port. */
   server_error: string | null;
+  /** The last attempt to register start-with-Windows failed (at startup or from Settings). */
+  autostart_error: SystemSettingError | null;
+  /** Why administrator mode is on but the app is not elevated, when known. */
+  admin_error: SystemSettingError | null;
 }
 export interface PairingAddress {
   ip: string;
