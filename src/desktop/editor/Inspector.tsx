@@ -5,6 +5,7 @@ import { keyInk } from "../../shared/theme";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
 import { Icon } from "./Icons";
+import "../screens.css"; // .switch
 
 type T = ReturnType<typeof createT>;
 export interface TestResult { id: string; ok: boolean; text: string }
@@ -99,6 +100,14 @@ export function Inspector(p: InspectorProps) {
             <ArgsInput key={b.id} id={`${id}a`} args={a.args} onChange={(args) => set({ action: { ...a, args } }, true)} />
             <p className="note">{t("editor.argsHint")}</p>
           </Field>
+          <div>
+            <label className="switch">
+              <input type="checkbox" role="switch" checked={a.admin}
+                onChange={(e) => set({ action: { ...a, admin: e.target.checked } })} />
+              <span>{t("editor.runAsAdmin")}</span>
+            </label>
+            <p className="note">{t("editor.runAsAdminHint")}</p>
+          </div>
         </>
       )}
 

@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod admin_token;
 pub mod auth;
 pub mod autostart;
 pub mod commands;
@@ -53,16 +54,27 @@ fn build_state(app: &tauri::App) -> Result<Arc<AppState>, Box<dyn std::error::Er
             *state.autostart_error.get_mut().unwrap_or_else(|e| e.into_inner()) =
                 autostart::apply(app.handle(), autostart, run_as_admin).err();
         }
-        let bound = server::bind(preferred_port).await;
+        // Elevated, the phone server takes its token from the registry only (see admin_token). Without one it stays
+        // off rather than fall back to the token in the user-writable config.json.
+        let bound = match admin_token::for_process(elevation::self_elevated(), admin_token::load_or_create) {
+            Ok(token) => {
+                let elevated = token.is_some();
+                *state.admin_token.get_mut().unwrap_or_else(|e| e.into_inner()) = token;
+                server::bind(preferred_port, elevated).await.map_err(|_| "bind_failed")
+            }
+            Err(code) => Err(code),
+        };
         match &bound {
             Ok((_, port)) => state.port.store(*port, Ordering::Relaxed),
-            Err(_) => state.startup.server_error = Some("bind_failed"),
+            Err(code) => state.startup.server_error = Some(code),
         }
         let state = Arc::new(state);
         if let Ok((listener, _)) = bound {
             let router = server::router(state.clone());
             tauri::async_runtime::spawn(async move {
-                let _ = axum::serve(listener, router).await;
+                // With the client address, which the elevated app's gate checks.
+                let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+                let _ = axum::serve(listener, service).await;
             });
         }
         Ok(state)
@@ -110,6 +122,8 @@ fn startup_gate() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 }
 
 pub fn run() {
+    // First, before Tauri starts any thread or WebView2 reads the environment.
+    elevation::harden_if_elevated();
     tauri::Builder::default()
         .plugin(startup_gate())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))

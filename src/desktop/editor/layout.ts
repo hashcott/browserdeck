@@ -4,7 +4,7 @@ const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️"
 
 export function defaultAction(type: Action["type"]): Action {
   switch (type) {
-    case "launch": return { type, path: "", args: [] };
+    case "launch": return { type, path: "", args: [], admin: false };
     case "hotkey": return { type, keys: [] };
     case "volume": return { type, op: "up" };
     case "obs_scene": return { type, scene: "" };

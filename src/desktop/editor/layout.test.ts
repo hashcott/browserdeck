@@ -66,7 +66,7 @@ test("newButton uses the default emoji per action type and leaves colour to the 
   }
 });
 test("defaultAction values", () => {
-  expect(defaultAction("launch")).toEqual({ type: "launch", path: "", args: [] });
+  expect(defaultAction("launch")).toEqual({ type: "launch", path: "", args: [], admin: false });
   expect(defaultAction("hotkey")).toEqual({ type: "hotkey", keys: [] });
   expect(defaultAction("volume")).toEqual({ type: "volume", op: "up" });
   expect(defaultAction("obs_scene")).toEqual({ type: "obs_scene", scene: "" });

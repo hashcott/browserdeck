@@ -72,7 +72,13 @@ pub enum Icon {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Action {
-    Launch { path: String, args: Vec<String> },
+    Launch {
+        path: String,
+        args: Vec<String>,
+        /// Ask Windows for administrator rights (UAC) on every press.
+        #[serde(default)]
+        admin: bool,
+    },
     /// KeyboardEvent.code values, e.g. ["ControlLeft", "KeyM"].
     Hotkey { keys: Vec<String> },
     Volume { op: VolumeOp },
@@ -346,6 +352,12 @@ mod tests {
         let id = c.pages[0].buttons[2].id.clone();
         assert_eq!(c.find_button(&id).unwrap().slot, 2);
         assert!(c.find_button("nope").is_none());
+    }
+
+    #[test]
+    fn launch_without_admin_field_loads_as_not_admin() {
+        let a: Action = serde_json::from_str(r#"{"type":"launch","path":"C:\\a.exe","args":[]}"#).unwrap();
+        assert_eq!(a, Action::Launch { path: r"C:\a.exe".into(), args: vec![], admin: false });
     }
 
     #[test]

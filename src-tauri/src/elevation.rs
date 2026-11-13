@@ -146,6 +146,118 @@ fn program_files_dirs() -> Vec<PathBuf> {
         .collect()
 }
 
+/// The names WebView2 reads to pick its runtime folder (where it loads DLLs from), data folder and browser
+/// arguments. Windows variable names ignore case.
+pub fn webview2_vars<I: IntoIterator<Item = String>>(names: I) -> Vec<String> {
+    names.into_iter().filter(|n| n.get(..9).is_some_and(|p| p.eq_ignore_ascii_case("WEBVIEW2_"))).collect()
+}
+
+/// An elevated copy inherits the user's environment (HKCU\Environment), which any program running as this user
+/// can write. So when elevated: drop every WEBVIEW2_* variable, otherwise one could point WebView2 at a folder of
+/// its own DLLs, and stop searching PATH and the current folder for DLLs. Must run before any thread starts.
+pub fn harden_if_elevated() {
+    if !self_elevated() {
+        return;
+    }
+    let names = std::env::vars_os().filter_map(|(name, _)| name.into_string().ok());
+    for name in webview2_vars(names) {
+        std::env::remove_var(name);
+    }
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::LibraryLoader::{SetDefaultDllDirectories, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS};
+        use windows::Win32::System::SystemServices::{
+            PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY, PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY_0,
+        };
+        use windows::Win32::System::Threading::{ProcessRedirectionTrustPolicy, SetProcessMitigationPolicy};
+
+        // SAFETY: plain flag argument. It only fails before Windows 8, which Tauri 2 does not run on.
+        let _ = unsafe { SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS) };
+        // Redirection Guard (EnforceRedirectionTrust, bit 0): never follow a junction a standard user made, so a
+        // junction in the user's app data folder cannot turn this app's file writes into writes anywhere.
+        // Windows versions without it refuse the call; nothing else changes then.
+        let policy = PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY {
+            Anonymous: PROCESS_MITIGATION_REDIRECTION_TRUST_POLICY_0 { Flags: 1 },
+        };
+        // SAFETY: `policy` is a live struct of the size passed, the layout this policy takes.
+        let _ = unsafe {
+            SetProcessMitigationPolicy(
+                ProcessRedirectionTrustPolicy,
+                &policy as *const _ as *const std::ffi::c_void,
+                std::mem::size_of_val(&policy),
+            )
+        };
+        // The runtime installed for all users, so a runtime registered for this user only (user-writable) is never
+        // loaded. Without one, WebView2 picks as usual.
+        if let Some(dir) = machine_webview2() {
+            std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", dir);
+        }
+        // Redirection Guard does not pass to child processes, and the elevated WebView2 browser process writes and
+        // deletes many files: keep its data and its temporary files (TMP/TEMP) out of the user's folders. Only with
+        // a machine install, which administrator mode requires; a per-user copy someone elevated by hand is out of
+        // scope (its exe can be replaced anyway).
+        if machine_install() {
+            if let Some(data) = std::env::current_exe().ok().and_then(|exe| admin_webview2_data(&exe)) {
+                let temp = data.join("Temp");
+                if std::fs::create_dir_all(&temp).is_ok() {
+                    std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &data);
+                    std::env::set_var("TMP", &temp);
+                    std::env::set_var("TEMP", &temp);
+                }
+            }
+        }
+    }
+}
+
+/// The elevated copy's WebView2 data folder, next to the exe: with a machine install only administrators can write
+/// there, unlike the default under the user's AppData, where a junction could redirect what the elevated browser
+/// process writes and deletes. None for a bare file name.
+pub fn admin_webview2_data(exe: &Path) -> Option<PathBuf> {
+    exe.parent().filter(|dir| !dir.as_os_str().is_empty()).map(|dir| dir.join("WebView2Admin"))
+}
+
+/// `location\pv` when both are set and the folder holds msedgewebview2.exe.
+pub fn webview2_runtime_folder(
+    location: Option<String>,
+    pv: Option<String>,
+    has_exe: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    let (location, pv) = (location.filter(|s| !s.is_empty())?, pv.filter(|s| !s.is_empty())?);
+    let dir = Path::new(&location).join(pv);
+    has_exe(&dir.join("msedgewebview2.exe")).then_some(dir)
+}
+
+/// The Evergreen WebView2 runtime installed for all users, from its EdgeUpdate entry in HKLM (32-bit view), which
+/// only administrators can change.
+#[cfg(windows)]
+fn machine_webview2() -> Option<PathBuf> {
+    use windows::core::HSTRING;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RRF_SUBKEY_WOW6432KEY};
+
+    let key = HSTRING::from(r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}");
+    let read = |name: &str| {
+        let mut buf = [0u16; 1024];
+        let mut bytes = std::mem::size_of_val(&buf) as u32;
+        // SAFETY: `buf` is live and `bytes` holds its size in bytes; RRF_RT_REG_SZ NUL-terminates the result.
+        unsafe {
+            RegGetValueW(
+                HKEY_LOCAL_MACHINE,
+                &key,
+                &HSTRING::from(name),
+                RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY,
+                None,
+                Some(buf.as_mut_ptr().cast()),
+                Some(&mut bytes),
+            )
+        }
+        .ok()
+        .ok()?;
+        let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        String::from_utf16(&buf[..len]).ok()
+    };
+    webview2_runtime_folder(read("location"), read("pv"), Path::is_file)
+}
+
 pub fn wait_pid(args: &[String]) -> Option<u32> {
     args.iter().find_map(|a| a.strip_prefix(WAIT_PID_ARG)?.parse().ok())
 }
@@ -223,6 +335,47 @@ mod tests {
         no(r"D:\Program Files\Browserdeck\browserdeck.exe");
         assert!(!is_machine_install(Path::new(r"C:\Program Files\B\b.exe"), &[]));
         assert!(!is_machine_install(Path::new(r"C:\b.exe"), &[PathBuf::new()]));
+    }
+
+    #[test]
+    fn picks_every_webview2_variable_whatever_its_case() {
+        let names = [
+            "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER",
+            "webview2_additional_browser_arguments",
+            "WebView2_User_Data_Folder",
+            "PATH",
+            "MY_WEBVIEW2_X",
+            "WEBVIEW2",
+        ]
+        .map(String::from);
+        assert_eq!(
+            webview2_vars(names),
+            ["WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", "webview2_additional_browser_arguments", "WebView2_User_Data_Folder"]
+        );
+    }
+
+    #[test]
+    fn webview2_folder_is_location_and_version_when_the_runtime_is_there() {
+        let loc = || Some(r"C:\P\EdgeWebView\Application".to_string());
+        let pv = || Some("131.0.2903.70".to_string());
+        let want = Path::new(r"C:\P\EdgeWebView\Application").join("131.0.2903.70");
+        assert_eq!(
+            webview2_runtime_folder(loc(), pv(), |exe| exe == want.join("msedgewebview2.exe")),
+            Some(want.clone())
+        );
+        assert_eq!(webview2_runtime_folder(loc(), None, |_| true), None);
+        assert_eq!(webview2_runtime_folder(loc(), Some(String::new()), |_| true), None);
+        assert_eq!(webview2_runtime_folder(None, pv(), |_| true), None);
+        assert_eq!(webview2_runtime_folder(Some(String::new()), pv(), |_| true), None);
+        assert_eq!(webview2_runtime_folder(loc(), pv(), |_| false), None);
+    }
+
+    #[test]
+    fn admin_webview2_data_sits_next_to_the_exe() {
+        // `/` separates on every platform the tests run on.
+        let exe = Path::new("C:/Program Files/Browserdeck/browserdeck.exe");
+        assert_eq!(admin_webview2_data(exe), Some(Path::new("C:/Program Files/Browserdeck").join("WebView2Admin")));
+        assert_eq!(admin_webview2_data(Path::new("browserdeck.exe")), None);
     }
 
     #[test]

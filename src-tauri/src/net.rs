@@ -27,6 +27,27 @@ pub fn lan_ips() -> Vec<Ipv4Addr> {
     )
 }
 
+/// Every address of every interface of this PC.
+pub fn own_ips() -> Vec<std::net::IpAddr> {
+    if_addrs::get_if_addrs().unwrap_or_default().into_iter().map(|i| i.ip()).collect()
+}
+
+/// What the elevated app accepts as the phone: a private LAN address (as `rank_ips` keeps) that is not this PC.
+/// Refuses the internet too, which a program here can reach the server from through a UPnP port forward.
+pub fn may_be_the_phone(peer: std::net::IpAddr, own: &[std::net::IpAddr]) -> bool {
+    let lan = match peer.to_canonical() {
+        std::net::IpAddr::V4(v4) => !rank_ips(vec![v4]).is_empty(),
+        std::net::IpAddr::V6(_) => false,
+    };
+    lan && !from_this_pc(peer, own)
+}
+
+/// Whether a client at `peer` runs on this PC: loopback, or one of `own` (this PC's addresses).
+pub fn from_this_pc(peer: std::net::IpAddr, own: &[std::net::IpAddr]) -> bool {
+    let peer = peer.to_canonical();
+    peer.is_loopback() || own.iter().any(|ip| ip.to_canonical() == peer)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -45,6 +66,29 @@ mod tests {
     fn drops_loopback_link_local_and_public() {
         let got = rank_ips(vec![ip("127.0.0.1"), ip("169.254.1.1"), ip("8.8.8.8"), ip("172.32.0.1"), ip("172.15.0.1")]);
         assert!(got.is_empty());
+    }
+
+    #[test]
+    fn from_this_pc_is_loopback_or_an_own_address() {
+        let own: [std::net::IpAddr; 2] = ["192.168.1.20".parse().unwrap(), "fe80::1".parse().unwrap()];
+        for p in ["127.0.0.1", "::1", "192.168.1.20", "::ffff:192.168.1.20", "fe80::1"] {
+            assert!(from_this_pc(p.parse().unwrap(), &own), "{p}");
+        }
+        for p in ["192.168.1.50", "10.0.0.2", "::ffff:192.168.1.50"] {
+            assert!(!from_this_pc(p.parse().unwrap(), &own), "{p}");
+        }
+    }
+
+    #[test]
+    fn the_phone_is_a_private_lan_address_that_is_not_this_pc() {
+        let own: [std::net::IpAddr; 1] = ["192.168.1.20".parse().unwrap()];
+        for p in ["192.168.1.50", "10.0.0.2", "172.16.4.4", "::ffff:192.168.1.50"] {
+            assert!(may_be_the_phone(p.parse().unwrap(), &own), "{p}");
+        }
+        // this PC, the internet (a UPnP-forwarded port), carrier NAT, link-local
+        for p in ["192.168.1.20", "127.0.0.1", "8.8.8.8", "100.64.0.5", "169.254.3.3", "::1"] {
+            assert!(!may_be_the_phone(p.parse().unwrap(), &own), "{p}");
+        }
     }
 
     #[test]

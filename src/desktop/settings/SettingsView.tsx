@@ -57,7 +57,7 @@ export interface SettingsViewProps {
 }
 
 const SAMPLE: Button[] = [
-  { id: "a", slot: 0, label: "", icon: { kind: "emoji", value: "🚀" }, color: null, action: { type: "launch", path: "", args: [] } },
+  { id: "a", slot: 0, label: "", icon: { kind: "emoji", value: "🚀" }, color: null, action: { type: "launch", path: "", args: [], admin: false } },
   { id: "b", slot: 1, label: "", icon: { kind: "emoji", value: "⌨️" }, color: null, action: { type: "hotkey", keys: [] } },
   { id: "c", slot: 2, label: "", icon: { kind: "emoji", value: "🔊" }, color: null, action: { type: "volume", op: "up" } },
   { id: "d", slot: 3, label: "", icon: { kind: "emoji", value: "🎬" }, color: null, action: { type: "obs_scene", scene: "" } },

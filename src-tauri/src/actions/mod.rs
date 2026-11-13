@@ -65,9 +65,9 @@ pub struct SystemExecutor {
 impl Executor for SystemExecutor {
     async fn run(&self, action: &Action) -> Result<(), ActionError> {
         match action {
-            Action::Launch { path, args } => {
-                let (path, args) = (path.clone(), args.clone());
-                tokio::task::spawn_blocking(move || launch::launch(&path, &args))
+            Action::Launch { path, args, admin } => {
+                let (path, args, admin) = (path.clone(), args.clone(), *admin);
+                tokio::task::spawn_blocking(move || launch::launch(&path, &args, admin))
                     .await
                     .unwrap_or(Err(ActionError::LaunchFailed))
             }
@@ -247,7 +247,7 @@ mod tests {
     #[tokio::test]
     async fn executor_routes_launch() {
         let r = system_executor()
-            .run(&Action::Launch { path: "/definitely/not/here.exe".into(), args: vec![] })
+            .run(&Action::Launch { path: "/definitely/not/here.exe".into(), args: vec![], admin: false })
             .await;
         assert_eq!(r, Err(ActionError::FileNotFound));
     }

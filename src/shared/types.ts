@@ -4,7 +4,7 @@
 export type Icon = { kind: "emoji"; value: string } | { kind: "image"; file: string };
 export type VolumeOp = "up" | "down" | "mute";
 export type Action =
-  | { type: "launch"; path: string; args: string[] }
+  | { type: "launch"; path: string; args: string[]; admin: boolean }
   | { type: "hotkey"; keys: string[] }
   | { type: "volume"; op: VolumeOp }
   | { type: "obs_scene"; scene: string };

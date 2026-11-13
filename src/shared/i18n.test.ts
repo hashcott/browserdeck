@@ -23,6 +23,10 @@ test("every error code has a message in both languages", () => {
     expect(vi).toHaveProperty(`error.${c}`);
   }
 });
+test("the administrator token startup error has a message in both languages", () => {
+  expect(en).toHaveProperty("error.admin_token_failed");
+  expect(vi).toHaveProperty("error.admin_token_failed");
+});
 test("createT interpolates and falls back to the key", () => {
   expect(createT("en")("no.such.key")).toBe("no.such.key");
   expect(createT("vi")("theme.deleteConfirm", { name: "X" })).toContain("X");

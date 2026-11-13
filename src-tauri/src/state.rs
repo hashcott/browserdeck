@@ -48,6 +48,8 @@ pub struct AppState {
     pub startup: Startup,
     /// How the last attempt to register start-with-Windows ended (at startup or from Settings).
     pub autostart_error: std::sync::Mutex<Option<SystemSettingError>>,
+    /// The pairing token while this process runs elevated (see admin_token); None: the one in config.json.
+    pub admin_token: std::sync::Mutex<Option<String>>,
 }
 
 /// What happened while starting up; read-only afterwards.
@@ -82,6 +84,16 @@ impl AppState {
             obs_settings,
             startup: Startup::default(),
             autostart_error: std::sync::Mutex::new(None),
+            admin_token: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// The pairing token the phone must present.
+    pub async fn token(&self) -> String {
+        let admin = self.admin_token.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        match admin {
+            Some(token) => token,
+            None => self.config.read().await.settings.token.clone(),
         }
     }
 }

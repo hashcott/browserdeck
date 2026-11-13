@@ -30,16 +30,42 @@ const NOT_PAIRED: &str = "<!doctype html><meta charset=\"utf-8\"><meta name=\"vi
 #[folder = "../dist"]
 struct Dist;
 
-/// Tries `preferred..=preferred+9` on all interfaces.
-pub async fn bind(preferred: u16) -> io::Result<(TcpListener, u16)> {
+/// Tries `preferred..=preferred+9` on all interfaces. `exclusive`: see `bind_port`.
+pub async fn bind(preferred: u16, exclusive: bool) -> io::Result<(TcpListener, u16)> {
     let mut last = io::Error::new(io::ErrorKind::AddrInUse, "no free port");
     for port in preferred..=preferred.saturating_add(9) {
-        match TcpListener::bind(("0.0.0.0", port)).await {
+        match bind_port(port, exclusive) {
             Ok(l) => return Ok((l, port)),
             Err(e) => last = e,
         }
     }
     Err(last)
+}
+
+/// `exclusive` (Windows, the elevated app): while this app holds the port, no other program can bind a more specific
+/// address on it (for example this PC's LAN address) and answer the phone in its place. The cost: after a restart
+/// the port stays blocked while connections this app closed wait in TIME_WAIT (about two minutes), so the server
+/// may move to the next port and the phone must scan again. A plain bind has neither.
+fn bind_port(port: u16, exclusive: bool) -> io::Result<TcpListener> {
+    let socket = tokio::net::TcpSocket::new_v4()?;
+    #[cfg(windows)]
+    if exclusive {
+        use std::os::windows::io::AsRawSocket;
+        use windows::Win32::Networking::WinSock::{setsockopt, SOCKET, SOL_SOCKET, SO_EXCLUSIVEADDRUSE};
+        let on = 1i32.to_ne_bytes();
+        // SAFETY: the socket is open and not yet bound; the option value is a live 4-byte BOOL.
+        let r = unsafe { setsockopt(SOCKET(socket.as_raw_socket() as usize), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, Some(&on)) };
+        if r != 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = exclusive; // no such option here
+        socket.set_reuseaddr(true)?; // what TcpListener::bind does on Unix
+    }
+    socket.bind((std::net::Ipv4Addr::UNSPECIFIED, port).into())?;
+    socket.listen(1024)
 }
 
 pub fn router(state: Arc<AppState>) -> Router {
@@ -60,15 +86,24 @@ fn cookie_token(cookies: &str) -> Option<&str> {
     cookies.split(';').find_map(|kv| kv.trim().strip_prefix("sd_token="))
 }
 
-/// Runs before routing touches anything: every request needs the pairing token.
+/// Runs before routing touches anything: every request needs the pairing token. The elevated app also refuses every
+/// client that cannot be the phone (`net::may_be_the_phone`): a program on this PC could have stolen its token (see
+/// admin_token). No client address (not served through `into_make_service_with_connect_info`) is refused too.
 async fn gate(State(state): State<Arc<AppState>>, req: Request, next: Next) -> Response {
+    let elevated = state.admin_token.lock().unwrap_or_else(|e| e.into_inner()).is_some();
+    if elevated {
+        let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
+        if !peer.is_some_and(|ip| crate::net::may_be_the_phone(ip, &crate::net::own_ips())) {
+            return StatusCode::FORBIDDEN.into_response();
+        }
+    }
     let from_query = req.uri().query().and_then(query_token);
     let from_cookie = req
         .headers()
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .and_then(cookie_token);
-    let expected = state.config.read().await.settings.token.clone();
+    let expected = state.token().await;
     let Some(given) = from_query.or(from_cookie) else { return not_paired() };
     if !auth::verify(&expected, given) {
         return not_paired();
@@ -239,12 +274,34 @@ mod tests {
     }
 
     async fn get(app: &Router, uri: &str, cookie: Option<&str>) -> Response {
+        get_from(app, uri, cookie, None).await
+    }
+
+    /// `peer`: the client address `axum::serve` would attach (it is absent in `oneshot` otherwise).
+    async fn get_from(app: &Router, uri: &str, cookie: Option<&str>, peer: Option<&str>) -> Response {
         let mut r = Request::builder().uri(uri);
         if let Some(c) = cookie {
             r = r.header(header::COOKIE, c);
         }
+        if let Some(p) = peer {
+            r = r.extension(axum::extract::ConnectInfo(p.parse::<std::net::SocketAddr>().unwrap()));
+        }
         app.clone().oneshot(r.body(Body::empty()).unwrap()).await.unwrap()
     }
+
+    fn elevated_app() -> (Router, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let state = Arc::new(AppState::new(
+            dir.path().to_path_buf(),
+            Config::default_with_token("secret".into()),
+            Arc::new(NullSink),
+            |_| Arc::new(OkExec),
+        ));
+        *state.admin_token.lock().unwrap() = Some("admintok".into());
+        (router(state), dir)
+    }
+
+    const LAN: Option<&str> = Some("192.168.1.50:5000");
 
     async fn body(r: Response) -> Vec<u8> {
         r.into_body().collect().await.unwrap().to_bytes().to_vec()
@@ -280,6 +337,62 @@ mod tests {
         let app = router(state);
         assert_eq!(get(&app, "/?token=", None).await.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(get(&app, "/", Some("sd_token=")).await.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn admin_token_is_the_only_token_while_set() {
+        let (app, _d) = elevated_app();
+        assert_eq!(get_from(&app, "/?token=admintok", None, LAN).await.status(), StatusCode::SEE_OTHER);
+        assert_eq!(get_from(&app, "/?token=secret", None, LAN).await.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(get_from(&app, "/", OK, LAN).await.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn elevated_server_refuses_this_pc() {
+        let (app, _d) = elevated_app();
+        let status = |r: Response| r.status();
+        assert_eq!(status(get_from(&app, "/?token=admintok", None, Some("127.0.0.1:5000")).await), StatusCode::FORBIDDEN);
+        assert_eq!(status(get_from(&app, "/?token=admintok", None, Some("[::1]:5000")).await), StatusCode::FORBIDDEN);
+        assert_eq!(status(get_from(&app, "/?token=admintok", None, None).await), StatusCode::FORBIDDEN);
+        assert_eq!(status(get_from(&app, "/?token=admintok", None, LAN).await), StatusCode::SEE_OTHER);
+    }
+
+    #[tokio::test]
+    async fn elevated_server_refuses_the_internet() {
+        let (app, _d) = elevated_app();
+        let r = get_from(&app, "/?token=admintok", None, Some("203.0.113.9:5000")).await;
+        assert_eq!(r.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn unelevated_server_accepts_this_pc() {
+        let (app, _d) = app();
+        let r = get_from(&app, "/?token=secret", None, Some("127.0.0.1:5000")).await;
+        assert_eq!(r.status(), StatusCode::SEE_OTHER);
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn nobody_can_bind_a_more_specific_address_on_our_port() {
+        let (_held, port) = bind(48500, true).await.unwrap();
+        let squat = tokio::net::TcpSocket::new_v4().unwrap();
+        squat.set_reuseaddr(true).unwrap();
+        assert!(squat.bind((std::net::Ipv4Addr::LOCALHOST, port).into()).is_err());
+    }
+
+    /// An exclusive port stays blocked while a connection this side closed first sits in TIME_WAIT (about two
+    /// minutes), so a plain bind is what lets an unelevated restart keep the port the phone knows.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn plain_bind_keeps_the_port_right_after_closing_a_connection() {
+        let (listener, port) = bind(48520, false).await.unwrap();
+        let client = tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port)).await.unwrap();
+        let (server_side, _) = listener.accept().await.unwrap();
+        drop(server_side); // this side closes first, so its end waits in TIME_WAIT
+        drop(listener);
+        drop(client);
+        let (_again, again) = bind(port, false).await.unwrap();
+        assert_eq!(again, port);
     }
 
     #[tokio::test]
@@ -330,8 +443,8 @@ mod tests {
 
     #[tokio::test]
     async fn bind_falls_back_when_port_busy() {
-        let (_held, p) = bind(48100).await.unwrap();
-        let (_l, got) = bind(p).await.unwrap();
+        let (_held, p) = bind(48100, false).await.unwrap();
+        let (_l, got) = bind(p, false).await.unwrap();
         assert!((p + 1..=p + 9).contains(&got));
     }
 
@@ -346,7 +459,7 @@ mod tests {
             Arc::new(NullSink),
             |_| Arc::new(OkExec),
         ));
-        let (listener, port) = bind(48300).await.unwrap();
+        let (listener, port) = bind(48300, false).await.unwrap();
         let router = router(state);
         tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
         let fetch = |target: &'static str| async move {

@@ -176,8 +176,28 @@ pub async fn autostart_setting(
     saved(update_settings(state, |s| s.autostart = enabled).await)
 }
 
-pub async fn regenerate(state: &AppState) -> Result<PairingInfo, ConfigError> {
-    update_settings(state, |s| s.token = crate::auth::new_token()).await?;
+/// A new pairing token; the phone is disconnected. Elevated, the token goes to the registry through `store_admin` and
+/// never into config.json.
+pub async fn regenerate(
+    state: &AppState,
+    store_admin: impl FnOnce(&str) -> std::io::Result<()>,
+) -> Result<PairingInfo, ConfigError> {
+    let elevated = {
+        // Held while storing, so two changes cannot leave memory and registry on different tokens.
+        let mut admin = state.admin_token.lock().unwrap_or_else(|e| e.into_inner());
+        match admin.as_mut() {
+            Some(current) => {
+                let token = crate::auth::new_token();
+                store_admin(&token).map_err(|_| ConfigError::SaveFailed)?;
+                *current = token;
+                true
+            }
+            None => false,
+        }
+    };
+    if !elevated {
+        update_settings(state, |s| s.token = crate::auth::new_token()).await?;
+    }
     state.hub.kick().await;
     Ok(pairing(state).await)
 }
@@ -197,9 +217,10 @@ pub fn build_pairing_info(ips: &[Ipv4Addr], port: u16, token: &str, preferred: O
 }
 
 pub async fn pairing(state: &AppState) -> PairingInfo {
+    let token = state.token().await;
     let c = state.config.read().await;
     let ips = net::lan_ips();
-    build_pairing_info(&ips, state.port.load(Ordering::Relaxed), &c.settings.token, c.settings.preferred_ip.as_deref())
+    build_pairing_info(&ips, state.port.load(Ordering::Relaxed), &token, c.settings.preferred_ip.as_deref())
 }
 
 pub async fn status(state: &AppState) -> Status {
@@ -293,7 +314,7 @@ pub async fn pairing_info(state: St<'_>) -> Result<PairingInfo, ()> {
 
 #[tauri::command]
 pub async fn regenerate_token(state: St<'_>) -> Result<PairingInfo, ConfigError> {
-    regenerate(&state).await
+    regenerate(&state, crate::admin_token::store).await
 }
 
 #[tauri::command]
@@ -336,13 +357,13 @@ pub async fn get_status(state: St<'_>) -> Result<Status, ()> {
     Ok(status(&state).await)
 }
 
-/// SECURITY: with administrator mode on, the elevated app runs whatever `path` + `args` the buttons in
-/// config.json name, and config.json lives in the user's own, user-writable app data folder. So any program
-/// running as this user can rewrite a button and have it run as administrator, which is a way to gain admin
-/// rights without a UAC prompt. The pairing token sits in the same file, so such a program need not even wait for
-/// someone to press the button: it can press it itself over the phone server. Not addressed here (no ACL changes,
-/// no de-elevated launch); see the Task 11 report. (The exe itself is covered: administrator mode requires a
-/// machine install, see `elevation::machine_install`.)
+/// SECURITY: config.json stays writable by every program running as this user, so the elevated app must not trust
+/// it with its rights. Launch buttons open programs through Explorer with standard rights (`launch::route`); a
+/// button marked admin goes through UAC each time. The phone server's token comes from an admin-only registry key
+/// (`admin_token`), not config.json. WEBVIEW2_* variables and PATH DLL search are dropped at start
+/// (`elevation::harden_if_elevated`). The exe itself must be a machine install (`elevation::machine_install`).
+/// Still open: such a program can change a shortcut button's keys (sent only when the owner presses it while an
+/// administrator window has focus) or an admin button's file (which the UAC prompt then names).
 #[tauri::command]
 pub async fn set_admin_mode(app: AppHandle, state: St<'_>, enabled: bool) -> Result<(), SystemSettingError> {
     if !cfg!(windows) {
@@ -444,12 +465,46 @@ mod tests {
     async fn regenerate_token_changes_token_and_kicks_phone() {
         let f = fixture(Ok(()));
         let (_id, mut rx) = f.state.hub.attach().await;
-        let info = regenerate(&f.state).await.unwrap();
+        let info = regenerate(&f.state, |_| panic!("unelevated must not store")).await.unwrap();
         let token = cfg(&f).await.settings.token;
         assert_ne!(token, "secret");
         assert!(on_disk(&f).contains(&token));
         assert_eq!(rx.recv().await, Some(ServerMsg::Kicked));
         assert!(info.addresses.iter().all(|a| a.url.ends_with(&format!("/?token={token}"))));
+    }
+
+    #[tokio::test]
+    async fn admin_token_replaces_file_token_for_pairing_and_never_reaches_the_file() {
+        let f = fixture(Ok(()));
+        *f.state.admin_token.lock().unwrap() = Some("admintok".into());
+        assert_eq!(f.state.token().await, "admintok");
+        let mut c = cfg(&f).await;
+        c.settings.language = "vi".into();
+        apply_config(&f.state, c).await.unwrap();
+        assert!(on_disk(&f).contains("secret") && !on_disk(&f).contains("admintok"));
+        let stored = std::sync::Mutex::new(String::new());
+        let info = regenerate(&f.state, |t| {
+            *stored.lock().unwrap() = t.into();
+            Ok(())
+        })
+        .await
+        .unwrap();
+        let new = stored.into_inner().unwrap();
+        assert_ne!(new, "admintok");
+        assert_eq!(f.state.token().await, new);
+        assert!(info.addresses.iter().all(|a| a.url.ends_with(&format!("/?token={new}"))));
+        assert!(!on_disk(&f).contains(&new) && on_disk(&f).contains("secret"));
+    }
+
+    #[tokio::test]
+    async fn admin_regenerate_that_cannot_store_changes_nothing() {
+        let f = fixture(Ok(()));
+        *f.state.admin_token.lock().unwrap() = Some("admintok".into());
+        let (_id, mut rx) = f.state.hub.attach().await;
+        let r = regenerate(&f.state, |_| Err(std::io::ErrorKind::PermissionDenied.into())).await;
+        assert_eq!(r.err(), Some(ConfigError::SaveFailed));
+        assert_eq!(f.state.token().await, "admintok");
+        assert!(rx.try_recv().is_err()); // not kicked
     }
 
     #[tokio::test]
