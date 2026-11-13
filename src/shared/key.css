@@ -5,10 +5,10 @@
 .key-face {
   --ring: 0px; --lip: 0px; --drop: 0px;
   /* Depth cues come from the key's own colour: a rim a step lighter (dark keys) or darker (light keys),
-     a lip and a soft shadow always darker, so they read on every colourway and on the theme ground. */
+     a lip always darker (listed first, so it paints over the rim), a soft shadow from the ground, so they read on every colourway and on the theme ground. */
   --rim: color-mix(in srgb, var(--key-bg) 72%, white);
   --lip-c: color-mix(in srgb, var(--key-bg) 62%, black);
-  --drop-c: color-mix(in srgb, var(--key-bg) 50%, black);
+  --drop-c: color-mix(in srgb, var(--ground, #22252b) 45%, black); /* from the ground, never lighter than it */
   font-family: "Figtree Variable", Figtree, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   container-type: inline-size;
   position: relative;
@@ -31,8 +31,8 @@
   background: var(--key-bg);
   color: var(--key-ink);
   box-shadow:
-    inset 0 0 0 var(--ring) var(--rim),
     inset 0 calc(var(--lip) * -1) 0 var(--lip-c),
+    inset 0 0 0 var(--ring) var(--rim),
     0 var(--drop) 10px -4px var(--drop-c);
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 90ms ease-out;
 }
@@ -59,7 +59,7 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
 
 /* depth */
 .depth-flat { --ring: 0px; }
-.depth-dish { --ring: 5cqw; --lip: 5cqw; --drop: 6px; }
+.depth-dish { --ring: 5cqw; --lip: 8cqw; --drop: 6px; }
 .depth-raised { --lip: 7cqw; --drop: 5px; }
 .key-light { --rim: color-mix(in srgb, var(--key-bg) 84%, black); }
 .depth-raised .key-cap { box-shadow: inset 0 2px 0 var(--rim), inset 0 calc(var(--lip) * -1) 0 var(--lip-c), 0 var(--drop) 8px -3px var(--drop-c); }

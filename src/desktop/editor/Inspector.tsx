@@ -1,6 +1,7 @@
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
 import type { ActionType, Button, ObsState, VolumeOp } from "../../shared/types";
+import { keyInk } from "../../shared/theme";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
 import { Icon } from "./Icons";
@@ -73,9 +74,9 @@ export function Inspector(p: InspectorProps) {
       <Field label={t("editor.color")}>
         <div className="color-row">
           {p.presets.map(({ type, color }) => (
-            <button key={type} type="button" className="preset" style={{ "--c": color } as CSSProperties}
+            <button key={type} type="button" className="preset" style={{ "--c": color, "--on": keyInk(color) } as CSSProperties}
               aria-label={t("editor.presetColor", { name: t(`action.${type}`), hex: color })}
-              aria-pressed={b.color?.toLowerCase() === color.toLowerCase()}
+              aria-pressed={(b.color ?? p.themeColor).toLowerCase() === color.toLowerCase()}
               onClick={() => set({ color }, false)} />
           ))}
           <input type="color" className="swatch" aria-label={t("editor.color")} value={b.color ?? p.themeColor}

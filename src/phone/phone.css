@@ -42,12 +42,11 @@ body { -webkit-text-size-adjust: 100%; }
 .pager::-webkit-scrollbar { display: none; }
 .slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; }
 
-/* Keys are square when the stage is short and grow taller to fill it, up to 4:5 (width:height).
-   --w is the widest grid with keys at least square; the height then stops at 4:5 keys or the stage. */
+/* Keys stretch to fill the stage, between 4:5 and 5:4 (width:height) either way, never rotated:
+   the grid is as wide and tall as the stage allows without any key passing those caps. */
 .deck-grid {
-  --w: min(100cqw, calc(100cqh * var(--cols) / var(--rows)));
-  width: var(--w);
-  height: min(100cqh, calc(var(--w) * 1.25 * var(--rows) / var(--cols)));
+  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows) * 1.25));
+  height: min(100cqh, calc(100cqw * var(--rows) / var(--cols) * 1.25));
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
   grid-template-rows: repeat(var(--rows), 1fr);
