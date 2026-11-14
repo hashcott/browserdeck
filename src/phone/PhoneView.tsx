@@ -1,7 +1,7 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { KeyFace } from "../shared/KeyFace";
 import { themeVars } from "../shared/theme";
-import type { Button, ServerMsg } from "../shared/types";
+import type { Button, ServerMsg, Theme } from "../shared/types";
 import type { ConnStatus } from "./connection";
 import "./phone.css";
 
@@ -20,13 +20,16 @@ export interface PhoneViewProps {
   onReload(): void;
 }
 
-const int = (n: number, d: number) => (Number.isInteger(n) && n > 0 && n <= 64 ? n : d);
+const int = (n: unknown, d: number): number => (typeof n === "number" && Number.isInteger(n) && n > 0 && n <= 64 ? n : d);
 
 export function PhoneView(p: PhoneViewProps) {
   const { layout, status, t } = p;
   const scroller = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
-  const vars = layout ? themeVars(layout.theme) : {};
+  const pages = layout?.pages ?? [];
+  const current = Math.min(page, Math.max(pages.length - 1, 0)); // pages may shrink on a layout update
+  // The chrome (status strip, dots) follows the page in view; each slide carries its own theme.
+  const vars = layout ? themeVars(pages[current]?.theme ?? layout.theme) : {};
 
   if (status === "kicked") {
     return (
@@ -40,12 +43,8 @@ export function PhoneView(p: PhoneViewProps) {
   }
 
   const open = status === "open";
-  const cols = layout ? int(layout.grid.cols, 3) : 3;
-  const rows = layout ? int(layout.grid.rows, 4) : 4;
-  const pages = layout?.pages ?? [];
   const empty = layout !== null && pages.every((pg) => pg.buttons.length === 0);
   const errorCode = p.errors[p.errors.length - 1]?.[1];
-  const current = Math.min(page, Math.max(pages.length - 1, 0)); // pages may shrink on a layout update
   const errorLine = errorCode ? (t(`error.${errorCode}`) === `error.${errorCode}` ? t("error.unknown") : t(`error.${errorCode}`)) : "";
 
   const goTo = (i: number) => {
@@ -55,7 +54,7 @@ export function PhoneView(p: PhoneViewProps) {
     el.scrollTo({ left: i * el.clientWidth, behavior: calm ? "auto" : "smooth" });
   };
 
-  const face = (b: Button) => {
+  const face = (b: Button, cols: number, theme: Theme) => {
     const name = b.label || t(`action.${b.action.type}`);
     const id = b.id;
     return (
@@ -74,7 +73,7 @@ export function PhoneView(p: PhoneViewProps) {
       >
         <KeyFace
           button={b}
-          theme={layout!.theme}
+          theme={theme}
           iconSrc={b.icon.kind === "image" ? `/icons/${encodeURIComponent(b.icon.file)}` : undefined}
           pressed={p.pressed.has(id)}
           error={p.errors.some(([e]) => e === id)}
@@ -96,13 +95,17 @@ export function PhoneView(p: PhoneViewProps) {
             ref={scroller}
             onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / (e.currentTarget.clientWidth || 1)))}
           >
-            {pages.map((pg) => (
-              <section key={pg.id} className="slide">
-                <div className="deck-grid" style={{ "--cols": cols, "--rows": rows } as CSSProperties}>
-                  {pg.buttons.filter((b) => b.slot >= 0 && b.slot < cols * rows).map(face)}
-                </div>
-              </section>
-            ))}
+            {pages.map((pg) => {
+              const cols = int(pg.grid?.cols, 3), rows = int(pg.grid?.rows, 4);
+              const theme = pg.theme ?? layout!.theme;
+              return (
+                <section key={pg.id} className="slide" style={themeVars(theme) as CSSProperties}>
+                  <div className="deck-grid" style={{ "--cols": cols, "--rows": rows } as CSSProperties}>
+                    {pg.buttons.filter((b) => b.slot >= 0 && b.slot < cols * rows).map((b) => face(b, cols, theme))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
         <div className="toast" role="status" aria-live="polite">{errorLine && <span>{errorLine}</span>}</div>

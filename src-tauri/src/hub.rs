@@ -1,5 +1,5 @@
 use crate::actions::ActionError;
-use crate::config::{Grid, Page};
+use crate::config::{Button, Grid, Page};
 use crate::state::{AppState, CoreEvent, EventSink};
 use crate::themes::{self, Theme};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,8 @@ use tokio::sync::mpsc;
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMsg {
-    Layout { pages: Vec<Page>, grid: Grid, language: String, theme: Theme },
+    /// `grid` and `theme` are the defaults; every page carries the grid and theme it is drawn with.
+    Layout { pages: Vec<LayoutPage>, grid: Grid, language: String, theme: Theme },
     Result { press_id: u64, ok: bool, error: Option<ActionError> },
     Kicked,
 }
@@ -21,15 +22,32 @@ pub enum ClientMsg {
     Press { press_id: u64, button_id: String },
 }
 
+/// A page as the phone draws it: its own grid and theme resolved against the defaults.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct LayoutPage {
+    pub id: String,
+    pub name: String,
+    pub buttons: Vec<Button>,
+    pub grid: Grid,
+    pub theme: Theme,
+}
+
 /// Layout from the current config; also used to push a fresh one after a config change.
 pub async fn layout_msg(state: &AppState) -> ServerMsg {
     let c = state.config.read().await;
-    ServerMsg::Layout {
-        pages: c.pages.clone(),
-        grid: c.settings.grid.clone(),
-        language: c.settings.language.clone(),
-        theme: themes::resolve(&state.data_dir, &c.settings.theme),
-    }
+    let theme = themes::resolve(&state.data_dir, &c.settings.theme);
+    let pages = c
+        .pages
+        .iter()
+        .map(|p: &Page| LayoutPage {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            buttons: p.buttons.clone(),
+            grid: c.page_grid(p).clone(),
+            theme: p.theme.as_deref().map_or_else(|| theme.clone(), |id| themes::resolve(&state.data_dir, id)),
+        })
+        .collect();
+    ServerMsg::Layout { pages, grid: c.settings.grid.clone(), language: c.settings.language.clone(), theme }
 }
 
 /// At most one phone at a time: a new connection kicks the old one.

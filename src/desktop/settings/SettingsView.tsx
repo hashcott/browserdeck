@@ -3,7 +3,7 @@ import type { createT } from "../../shared/i18n";
 import { KeyFace } from "../../shared/KeyFace";
 import type { Button, Config, ObsState, Theme, ThemeInfo } from "../../shared/types";
 import { Icon, StatusDot } from "../editor/Icons";
-import { ScreenBar } from "../ScreenBar";
+import { CloseButton, Screen } from "../Screen";
 import "../screens.css";
 import { CommitText, NumField } from "./NumField";
 
@@ -41,7 +41,11 @@ export interface WindowsSection {
   /** The last start-with-Windows registration failed. */
   autostartError: string | null;
 }
+/** The settings sections, one shown at a time. */
+export type SettingsSection = "theme" | "language" | "grid" | "obs" | "server" | "windows";
 export interface SettingsViewProps {
+  /** The section to open on; the first one when absent. */
+  startAt?: SettingsSection;
   config: Config;
   themes: ThemeInfo[];
   previews: Record<string, Theme>;
@@ -78,20 +82,36 @@ export function SettingsScreen(p: SettingsViewProps) {
   const [obsText, obsHelp] = OBS_TEXT[p.obs];
   const w = p.windows;
 
+  const [cur, setCur] = useState<SettingsSection>(p.startAt ?? "theme");
+  const sections: [SettingsSection, string][] = [
+    ["theme", t("settings.theme")], ["language", t("settings.language")], ["grid", t("settings.grid")], ["obs", t("settings.obs")], ["server", t("settings.server")],
+    ...(w ? [["windows", t("settings.windows")] as [SettingsSection, string]] : []),
+  ];
+
   return (
-    <div className="screen">
-      <ScreenBar title={t("settings.title")} backLabel={t("settings.back")} onBack={on.back} t={t} />
-      <main className="page">
-        <div className="page-inner settings">
+    <Screen className="settings-screen" onClose={on.back}>
+      <nav className="set-nav" aria-labelledby={`${id}nav`}>
+        <h1 className="cat" id={`${id}nav`}>{t("settings.title")}</h1>
+        <ul>
+          {sections.map(([k, label]) => (
+            <li key={k}>
+              <button type="button" aria-controls={`${id}${k}`} aria-current={k === cur ? "page" : undefined} onClick={() => setCur(k)}>{label}</button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <main className="set-main">
+        <div className="set-inner">
           {p.saveError && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{p.saveError}</p>}
 
-          <section className="panel" aria-labelledby={`${id}t`}>
+          <section className="panel" id={`${id}theme`} aria-labelledby={`${id}themeh`} hidden={cur !== "theme"}>
             <div className="panel-head">
-              <h2 id={`${id}t`}>{t("settings.theme")}</h2>
+              <h2 id={`${id}themeh`}>{t("settings.theme")}</h2>
               <button type="button" className="btn small" onClick={on.importTheme}><Icon name="folder" size={16} />{t("theme.import")}</button>
             </div>
+            <p className="note lede">{t("settings.defaultsNote")}</p>
             {p.themeError && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{p.themeError}</p>}
-            <ul className="themes" role="radiogroup" aria-labelledby={`${id}t`}>
+            <ul className="themes" role="radiogroup" aria-labelledby={`${id}themeh`}>
               {p.themes.map((th) => {
                 const preview = p.previews[th.id];
                 const on_ = s.theme === th.id;
@@ -105,7 +125,7 @@ export function SettingsScreen(p: SettingsViewProps) {
                       {/* name and author are untrusted free text: plain React text, truncated by CSS */}
                       <span className="theme-meta">
                         <b className="clip" title={th.name}>{th.name}</b>
-                        <i className="clip" title={th.author}>{t("settings.themeBy", { author: th.author })}</i>
+                        {th.author && <i className="clip" title={th.author}>{t("settings.themeBy", { author: th.author })}</i>}
                         {on_ && <span className="theme-now"><Icon name="check" size={14} />{t("settings.themeCurrent")}</span>}
                       </span>
                     </label>
@@ -113,8 +133,8 @@ export function SettingsScreen(p: SettingsViewProps) {
                       <div className="theme-confirm" role="group" aria-label={t("theme.delete")}>
                         <p className="clip2">{t("theme.deleteConfirm", { name: th.name })}</p>
                         <div className="row">
-                          <button type="button" className="btn small danger" onClick={() => on.deleteTheme(th.id)} autoFocus>{t("common.delete")}</button>
-                          <button type="button" className="btn small" onClick={on.cancelDeleteTheme}>{t("common.cancel")}</button>
+                          <button type="button" className="btn small danger" onClick={() => on.deleteTheme(th.id)}>{t("common.delete")}</button>
+                          <button type="button" className="btn small" autoFocus onClick={on.cancelDeleteTheme}>{t("common.cancel")}</button>
                         </div>
                       </div>
                     ) : (
@@ -126,9 +146,9 @@ export function SettingsScreen(p: SettingsViewProps) {
             </ul>
           </section>
 
-          <section className="panel" aria-labelledby={`${id}l`}>
-            <h2 id={`${id}l`}>{t("settings.language")}</h2>
-            <div className="seg" role="radiogroup" aria-labelledby={`${id}l`}>
+          <section className="panel" id={`${id}language`} aria-labelledby={`${id}languageh`} hidden={cur !== "language"}>
+            <h2 id={`${id}languageh`}>{t("settings.language")}</h2>
+            <div className="seg" role="radiogroup" aria-labelledby={`${id}languageh`}>
               {LANGS.map((l) => (
                 <label key={l}>
                   <input type="radio" name={`${id}lang`} checked={s.language === l} onChange={() => on.setLanguage(l)} />
@@ -138,8 +158,9 @@ export function SettingsScreen(p: SettingsViewProps) {
             </div>
           </section>
 
-          <section className="panel" aria-labelledby={`${id}g`}>
-            <h2 id={`${id}g`}>{t("settings.grid")}</h2>
+          <section className="panel" id={`${id}grid`} aria-labelledby={`${id}gridh`} hidden={cur !== "grid"}>
+            <h2 id={`${id}gridh`}>{t("settings.grid")}</h2>
+            <p className="note lede">{t("settings.defaultsNote")}</p>
             <div className="fields">
               <NumField label={t("settings.cols")} value={s.grid.cols} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(n, s.grid.rows)} onBlur={on.clearGridError} />
               <NumField label={t("settings.rows")} value={s.grid.rows} min={1} max={8} t={t} onType onCommit={(n) => on.setGrid(s.grid.cols, n)} onBlur={on.clearGridError} />
@@ -147,8 +168,8 @@ export function SettingsScreen(p: SettingsViewProps) {
             {p.gridError && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{t("settings.gridNoFit")}</p>}
           </section>
 
-          <section className="panel" aria-labelledby={`${id}o`}>
-            <h2 id={`${id}o`}>{t("settings.obs")}</h2>
+          <section className="panel" id={`${id}obs`} aria-labelledby={`${id}obsh`} hidden={cur !== "obs"}>
+            <h2 id={`${id}obsh`}>{t("settings.obs")}</h2>
             <div className="fields">
               <CommitText label={t("settings.obsHost")} value={s.obs.host} allowEmpty={false} onCommit={(host) => on.setObs({ host })} />
               <NumField label={t("settings.obsPort")} value={s.obs.port} min={1} max={65535} t={t} onCommit={(n) => on.setObs({ port: n })} />
@@ -162,15 +183,15 @@ export function SettingsScreen(p: SettingsViewProps) {
             </div>
           </section>
 
-          <section className="panel" aria-labelledby={`${id}s`}>
-            <h2 id={`${id}s`}>{t("settings.server")}</h2>
+          <section className="panel" id={`${id}server`} aria-labelledby={`${id}serverh`} hidden={cur !== "server"}>
+            <h2 id={`${id}serverh`}>{t("settings.server")}</h2>
             <NumField label={t("settings.port")} value={s.port} min={1} max={65535} t={t} onCommit={on.setPort} />
             <p className="note">{t("settings.portNote")}</p>
           </section>
 
           {w && (
-            <section className="panel" aria-labelledby={`${id}w`}>
-              <h2 id={`${id}w`}>{t("settings.windows")}</h2>
+            <section className="panel" id={`${id}windows`} aria-labelledby={`${id}windowsh`} hidden={cur !== "windows"}>
+              <h2 id={`${id}windowsh`}>{t("settings.windows")}</h2>
               {w.error && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{w.error}</p>}
               <div className="opts">
                 <div>
@@ -188,8 +209,8 @@ export function SettingsScreen(p: SettingsViewProps) {
                     <div className="confirm-box" role="group" aria-label={t("settings.runAsAdmin")}>
                       <p className="warn"><Icon name="alert" size={18} /><span>{t("settings.adminWarning")} {t("settings.adminRisk")}</span></p>
                       <div className="row">
-                        <button type="button" className="btn danger" onClick={() => on.setAdmin(true)} autoFocus>{t("settings.adminTurnOn")}</button>
-                        <button type="button" className="btn" onClick={on.cancelAdmin}>{t("common.cancel")}</button>
+                        <button type="button" className="btn danger" onClick={() => on.setAdmin(true)}>{t("settings.adminTurnOn")}</button>
+                        <button type="button" className="btn" autoFocus onClick={on.cancelAdmin}>{t("common.cancel")}</button>
                       </div>
                     </div>
                   )}
@@ -207,6 +228,7 @@ export function SettingsScreen(p: SettingsViewProps) {
           )}
         </div>
       </main>
-    </div>
+      <div className="set-close"><CloseButton label={t("settings.back")} onClose={on.back} /></div>
+    </Screen>
   );
 }

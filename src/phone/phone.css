@@ -40,7 +40,7 @@ body { -webkit-text-size-adjust: 100%; }
   scroll-snap-type: x mandatory; touch-action: pan-x; scrollbar-width: none;
 }
 .pager::-webkit-scrollbar { display: none; }
-.slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; }
+.slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; background: var(--ground, #22252b); }
 
 /* Keys stretch to fill the stage, between 4:5 and 5:4 (width:height) either way, never rotated:
    the grid is as wide and tall as the stage allows without any key passing those caps. */

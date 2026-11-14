@@ -30,10 +30,10 @@ function Row({ type, t }: { type: ActionType; t: T }) {
 
 export function ActionPalette({ t }: { t: T }) {
   return (
-    <aside className="left" aria-labelledby="actions-h">
-      <h2 id="actions-h">{t("editor.actions")}</h2>
+    <section aria-labelledby="actions-h">
+      <div className="cat"><h2 id="actions-h">{t("editor.actions")}</h2></div>
       <ul className="acts">{ACTION_TYPES.map((a) => <Row key={a} type={a} t={t} />)}</ul>
       <p className="note">{t("editor.dragHint")}</p>
-    </aside>
+    </section>
   );
 }

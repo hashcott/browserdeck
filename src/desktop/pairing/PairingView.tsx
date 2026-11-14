@@ -3,7 +3,7 @@ import { useId } from "react";
 import type { createT } from "../../shared/i18n";
 import type { PairingInfo } from "../../shared/types";
 import { Icon } from "../editor/Icons";
-import { ScreenBar } from "../ScreenBar";
+import { CloseButton, Screen } from "../Screen";
 import { pairingView } from "./pairing";
 import "../screens.css";
 
@@ -31,8 +31,12 @@ export function PairingScreen(p: PairingViewProps) {
   const id = useId();
   const view = p.state.kind === "info" ? pairingView(p.state.info) : null;
   return (
-    <div className="screen">
-      <ScreenBar title={t("pairing.title")} backLabel={t("settings.back")} onBack={p.onBack} t={t} />
+    <Screen className="pairing-screen" onClose={p.onBack}>
+      <header className="head">
+        <Icon name="phone" size={20} />
+        <h1>{t("pairing.title")}</h1>
+        <CloseButton label={t("settings.back")} onClose={p.onBack} />
+      </header>
       <main className="page">
         <div className="page-inner pairing">
           {p.phoneConnected && (
@@ -107,8 +111,8 @@ export function PairingScreen(p: PairingViewProps) {
                     <div role="group" aria-label={t("pairing.regenerate")} className="confirm-box">
                       <p>{t("pairing.regenerateConfirm")}</p>
                       <div className="row">
-                        <button type="button" className="btn danger" onClick={p.onConfirmRegenerate} autoFocus>{t("pairing.regenerateYes")}</button>
-                        <button type="button" className="btn" onClick={p.onCancelRegenerate}>{t("common.cancel")}</button>
+                        <button type="button" className="btn danger" onClick={p.onConfirmRegenerate}>{t("pairing.regenerateYes")}</button>
+                        <button type="button" className="btn" autoFocus onClick={p.onCancelRegenerate}>{t("common.cancel")}</button>
                       </div>
                     </div>
                   ) : (
@@ -122,6 +126,6 @@ export function PairingScreen(p: PairingViewProps) {
           {p.error && <p className="inline-error" role="alert"><Icon name="alert" size={18} />{p.error}</p>}
         </div>
       </main>
-    </div>
+    </Screen>
   );
 }

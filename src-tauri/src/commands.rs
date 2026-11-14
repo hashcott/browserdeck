@@ -260,18 +260,23 @@ pub async fn import_icon_file(state: &AppState, source: &Path) -> Result<String,
     Ok(name)
 }
 
-/// Deleting the active theme falls back to the default and pushes a fresh layout.
-/// Under the config lock: persist the fallback first (a failed save aborts, file kept), then delete.
+/// Deleting a theme in use (the default, or a page's own) falls back to the default theme there and pushes a
+/// fresh layout. Under the config lock: persist the fallback first (a failed save aborts, file kept), then delete.
 pub async fn remove_theme(state: &AppState, id: &str) -> Result<(), ThemeError> {
     let was_active = {
         let mut cur = state.config.write().await;
         if themes::list(&state.data_dir).iter().any(|t| t.id == id && t.builtin) {
             return Err(ThemeError::BuiltinId);
         }
-        let active = cur.settings.theme == id;
+        let active = cur.settings.theme == id || cur.pages.iter().any(|p| p.theme.as_deref() == Some(id));
         if active {
             let mut next = cur.clone();
-            next.settings.theme = DEFAULT_THEME_ID.to_string();
+            if next.settings.theme == id {
+                next.settings.theme = DEFAULT_THEME_ID.to_string();
+            }
+            for p in next.pages.iter_mut().filter(|p| p.theme.as_deref() == Some(id)) {
+                p.theme = None;
+            }
             config::save(&state.data_dir, &next).map_err(|_| ThemeError::Io)?;
             *cur = next;
         }
@@ -389,7 +394,7 @@ pub async fn set_autostart(app: AppHandle, state: St<'_>, enabled: bool) -> Resu
 mod tests {
     use super::*;
     use crate::actions::testing::{fixture, Fixture};
-    use crate::config::is_icon_file_name;
+    use crate::config::{is_icon_file_name, Grid};
     use crate::hub::ServerMsg;
 
     fn ip(s: &str) -> Ipv4Addr {
@@ -624,6 +629,44 @@ mod tests {
         assert!(on_disk(&f).contains("\"theme\": \"keycap\""));
         assert_eq!(next_theme(&mut rx).await, "keycap");
         assert!(themes::list(&f.state.data_dir).iter().all(|t| t.id != "mine"));
+    }
+
+    #[tokio::test]
+    async fn deleting_a_theme_only_a_page_uses_puts_that_page_on_the_default() {
+        let f = fixture(Ok(()));
+        let src = theme_file(&f.state.data_dir);
+        themes::import(&f.state.data_dir, &src).unwrap();
+        let mut c = cfg(&f).await;
+        c.pages[0].theme = Some("mine".into());
+        apply_config(&f.state, c).await.unwrap();
+        let (_id, mut rx) = f.state.hub.attach().await;
+        remove_theme(&f.state, "mine").await.unwrap();
+        let now = cfg(&f).await;
+        assert_eq!((now.settings.theme.as_str(), now.pages[0].theme.clone()), ("keycap", None));
+        match rx.recv().await {
+            Some(ServerMsg::Layout { pages, .. }) => assert_eq!(pages[0].theme.id, "keycap"),
+            other => panic!("expected a layout, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn the_layout_resolves_each_page_against_the_defaults() {
+        let f = fixture(Ok(()));
+        let mut c = cfg(&f).await;
+        let mut second = c.pages[0].clone();
+        (second.id, second.buttons) = ("second".into(), vec![]);
+        second.grid = Some(Grid { cols: 5, rows: 2 });
+        second.theme = Some("arcade".into());
+        c.pages.push(second);
+        apply_config(&f.state, c).await.unwrap();
+        match layout_msg(&f.state).await {
+            ServerMsg::Layout { pages, grid, theme, .. } => {
+                assert_eq!(((grid.cols, grid.rows), theme.id.as_str()), ((3, 4), "keycap"));
+                assert_eq!(((pages[0].grid.cols, pages[0].grid.rows), pages[0].theme.id.as_str()), ((3, 4), "keycap"));
+                assert_eq!(((pages[1].grid.cols, pages[1].grid.rows), pages[1].theme.id.as_str()), ((5, 2), "arcade"));
+            }
+            other => panic!("expected a layout, got {other:?}"),
+        }
     }
 
     #[tokio::test]

@@ -23,6 +23,10 @@ export interface Page {
   id: string;
   name: string;
   buttons: Button[];
+  /** The page's own grid; null or absent = settings.grid. */
+  grid?: Grid | null;
+  /** The page's own theme id; null or absent = settings.theme. */
+  theme?: string | null;
 }
 export interface Grid {
   cols: number;
@@ -122,8 +126,16 @@ export const ALL_ERROR_CODES: readonly string[] = [
 ];
 
 // Phone WebSocket protocol (hub.rs)
+/** A page as the phone draws it: its own grid and theme, already resolved against the defaults. */
+export interface LayoutPage {
+  id: string;
+  name: string;
+  buttons: Button[];
+  grid: Grid;
+  theme: Theme;
+}
 export type ServerMsg =
-  | { type: "layout"; pages: Page[]; grid: Grid; language: string; theme: Theme }
+  | { type: "layout"; pages: LayoutPage[]; grid: Grid; language: string; theme: Theme }
   | { type: "result"; press_id: number; ok: boolean; error: ActionError | null }
   | { type: "kicked" };
 export type ClientMsg = { type: "press"; press_id: number; button_id: string };

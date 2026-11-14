@@ -4,7 +4,9 @@ import { AppFrame, type View } from "./AppFrame";
 import { Editor } from "./editor/Editor";
 import "./editor/editor.css";
 import { Pairing } from "./pairing/PairingPage";
+import { Rail } from "./Rail";
 import { Settings } from "./settings/Settings";
+import type { SettingsSection } from "./settings/SettingsView";
 import { useConfigStore, type LoadedStore } from "./useConfigStore";
 
 const TOAST_MS = 6000;
@@ -12,6 +14,7 @@ const TOAST_MS = 6000;
 export function App() {
   const store = useConfigStore();
   const [chosen, setChosen] = useState<View | null>(null);
+  const [settingsAt, setSettingsAt] = useState<SettingsSection>();
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
   const lang = resolveLang(store.config?.settings.language ?? "auto", navigator.language);
@@ -55,12 +58,14 @@ export function App() {
   if (!config || !runtime) return <p className="screen loading" role="status">{t("common.loading")}</p>;
   const loaded = store as LoadedStore;
   const toEditor = () => setChosen("editor");
+  const go = (v: View, section?: SettingsSection) => { setSettingsAt(section); setChosen(v); };
 
   return (
     <AppFrame view={view} toast={toast}
-      editor={<Editor store={loaded} t={t} showToast={showToast} onPair={() => setChosen("pairing")} onSettings={() => setChosen("settings")} />}>
+      rail={<Rail view={view} phoneConnected={loaded.status.phone_connected} t={t} onNavigate={(v) => go(v)} />}
+      editor={<Editor store={loaded} t={t} showToast={showToast} onPair={() => go("pairing")} onObsSettings={() => go("settings", "obs")} />}>
       {view === "pairing" && <Pairing store={loaded} t={t} onBack={toEditor} />}
-      {view === "settings" && <Settings store={loaded} t={t} onBack={toEditor} />}
+      {view === "settings" && <Settings store={loaded} t={t} startAt={settingsAt} onBack={toEditor} />}
     </AppFrame>
   );
 }

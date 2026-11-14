@@ -2,11 +2,11 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createT } from "../../shared/i18n";
-import type { ActionType, Button, ObsState, Theme } from "../../shared/types";
+import type { ActionType, Button, Grid, ObsState, Theme, ThemeInfo } from "../../shared/types";
 import * as api from "../api";
 import { EditorView, type Confirm, type EditorHandlers, type Notice } from "./EditorView";
 import type { TestResult } from "./Inspector";
-import { defaultAction, moveButton, newButton, placeNew, removeButton, updateButton } from "./layout";
+import { defaultAction, fitsGrid, moveButton, newButton, placeNew, removeButton, updateButton } from "./layout";
 import type { LoadedStore } from "../useConfigStore";
 
 const IMAGE_EXT = ["png", "jpg", "jpeg", "webp"];
@@ -16,13 +16,13 @@ export interface EditorProps {
   t: ReturnType<typeof createT>;
   /** The "pair phone" button. */
   onPair(): void;
-  /** The settings button in the top bar. */
-  onSettings(): void;
+  /** Opens Settings at the OBS section. */
+  onObsSettings(): void;
   /** Shows a message in the app's one toast region. */
   showToast(text: string): void;
 }
 
-export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps) {
+export function Editor({ store, t, onPair, onObsSettings, showToast }: EditorProps) {
   const { config, runtime, status, commit, flush, latest } = store;
   const [theme, setTheme] = useState<Theme | null>(null);
   const [scenes, setScenes] = useState<string[]>([]);
@@ -43,13 +43,19 @@ export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps)
   }, [showToast]);
 
 
-  const themeId = config.settings.theme;
+  const page = config.pages.find((pg) => pg.id === pageId) ?? config.pages[0];
+  // The open page's own theme, or the default one.
+  const themeId = page?.theme ?? config.settings.theme;
   useEffect(() => {
     if (!themeId) return;
     let alive = true;
     api.getTheme(themeId).then((th) => alive && setTheme(th), (e) => alive && showError(e));
     return () => { alive = false; };
   }, [themeId, showError]);
+  // Theme names for the page panel; refreshed when its picker is opened (themes are imported in Settings).
+  const [themes, setThemes] = useState<ThemeInfo[]>([]);
+  const loadThemes = useCallback(() => { api.listThemes().then(setThemes, () => {}); }, []);
+  useEffect(loadThemes, [loadThemes]);
 
   // Scene list: refetched whenever the OBS state changes.
   const obs: ObsState = status.obs;
@@ -60,7 +66,6 @@ export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps)
     return () => { alive = false; };
   }, [obs]);
 
-  const page = config.pages.find((pg) => pg.id === pageId) ?? config.pages[0];
   const withPage = useCallback((fn: (pg: NonNullable<typeof page>) => NonNullable<typeof page>, slow = false) => {
     const cur = latest();
     const pg = cur?.pages.find((x) => x.id === pageId) ?? cur?.pages[0];
@@ -155,9 +160,18 @@ export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps)
         patchButton(id, (b) => (b.action.type === "launch" ? { ...b, action: { ...b.action, path } } : b));
       } catch (e) { showError(e); }
     },
+    setPageGrid: (grid: Grid | null) => {
+      const cur = latest();
+      const pg = cur?.pages.find((x) => x.id === pageId) ?? cur?.pages[0];
+      if (!cur || !pg || !fitsGrid([pg], grid ?? cur.settings.grid)) return false;
+      withPage((x) => ({ ...x, grid }));
+      return true;
+    },
+    setPageTheme: (id: string | null) => withPage((x) => ({ ...x, theme: id })),
+    loadThemes,
     dismissNotice: (id) => setDismissed((d) => new Set(d).add(id)),
     pair: onPair,
-    settings: onSettings,
+    obsSettings: onObsSettings,
   };
 
   if (!theme || !page) return <p className="loading" role="status">{t("common.loading")}</p>;
@@ -173,7 +187,7 @@ export function Editor({ store, t, onPair, onSettings, showToast }: EditorProps)
 
   return (
     <EditorView
-      config={config} theme={theme} pageId={page.id} selectedId={selectedId} confirm={confirm} status={status}
+      config={config} theme={theme} themes={themes} pageId={page.id} selectedId={selectedId} confirm={confirm} status={status}
       scenes={scenes} platform={runtime.platform} notices={notices.filter((n) => !dismissed.has(n.id))}
       testResult={testResult} testing={testing} focusReq={focusReq} t={t}
       iconSrc={(b) => (b.icon.kind === "image" ? convertFileSrc(`${icons}/${b.icon.file}`) : undefined)}

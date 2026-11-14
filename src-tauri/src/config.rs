@@ -48,6 +48,12 @@ pub struct Page {
     pub id: String,
     pub name: String,
     pub buttons: Vec<Button>,
+    /// The page's own grid size; None = `settings.grid`. Absent in files written before per-page grids.
+    #[serde(default)]
+    pub grid: Option<Grid>,
+    /// The page's own button theme id; None = `settings.theme`.
+    #[serde(default)]
+    pub theme: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -152,23 +158,30 @@ impl Config {
                     volume(1, VolumeOp::Up, "\u{1F50A}"),
                     volume(2, VolumeOp::Mute, "\u{1F507}"),
                 ],
+                grid: None,
+                theme: None,
             }],
         }
     }
 
+    /// The grid a page is laid out on: its own, or the default.
+    pub fn page_grid<'a>(&'a self, page: &'a Page) -> &'a Grid {
+        page.grid.as_ref().unwrap_or(&self.settings.grid)
+    }
+
     pub fn validate(&self) -> Result<(), ConfigError> {
         use ConfigError::*;
-        let g = &self.settings.grid;
-        if !(1..=8).contains(&g.cols) || !(1..=8).contains(&g.rows) {
+        let grid_ok = |g: &Grid| (1..=8).contains(&g.cols) && (1..=8).contains(&g.rows);
+        let theme_ok = |t: &str| {
+            (1..=40).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        };
+        if !grid_ok(&self.settings.grid) {
             return Err(BadGrid);
         }
         if self.settings.port == 0 {
             return Err(BadPort);
         }
-        let t = &self.settings.theme;
-        if !(1..=40).contains(&t.len())
-            || !t.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        {
+        if !theme_ok(&self.settings.theme) {
             return Err(BadTheme);
         }
         if self.pages.is_empty() {
@@ -179,6 +192,13 @@ impl Config {
             if !ids.insert(p.id.as_str()) {
                 return Err(DuplicateId);
             }
+            if p.grid.as_ref().is_some_and(|g| !grid_ok(g)) {
+                return Err(BadGrid);
+            }
+            if p.theme.as_deref().is_some_and(|t| !theme_ok(t)) {
+                return Err(BadTheme);
+            }
+            let g = self.page_grid(p);
             let mut slots = HashSet::new();
             for b in &p.buttons {
                 if !ids.insert(b.id.as_str()) {
@@ -294,6 +314,39 @@ mod tests {
         let mut c = cfg();
         c.pages[0].buttons[0].slot = 12;
         assert_eq!(c.validate(), Err(ConfigError::SlotOutOfRange));
+    }
+
+    #[test]
+    fn a_page_grid_sets_its_own_slot_range() {
+        let mut c = cfg(); // default grid 3 x 4 = 12 slots
+        c.pages[0].grid = Some(Grid { cols: 4, rows: 4 });
+        c.pages[0].buttons[0].slot = 15;
+        assert_eq!(c.validate(), Ok(()));
+        c.pages[0].grid = Some(Grid { cols: 2, rows: 2 });
+        assert_eq!(c.validate(), Err(ConfigError::SlotOutOfRange));
+        c.pages[0].grid = Some(Grid { cols: 9, rows: 2 });
+        assert_eq!(c.validate(), Err(ConfigError::BadGrid));
+        c.pages[0].grid = None; // back on the default grid, slot 15 is outside it
+        assert_eq!(c.validate(), Err(ConfigError::SlotOutOfRange));
+    }
+
+    #[test]
+    fn a_page_theme_is_checked_like_the_default() {
+        let mut c = cfg();
+        c.pages[0].theme = Some("arcade".into());
+        assert_eq!(c.validate(), Ok(()));
+        c.pages[0].theme = Some("../x".into());
+        assert_eq!(c.validate(), Err(ConfigError::BadTheme));
+    }
+
+    #[test]
+    fn a_file_without_page_grid_or_theme_still_loads() {
+        let mut v = serde_json::to_value(cfg()).unwrap();
+        let page = v["pages"][0].as_object_mut().unwrap();
+        page.remove("grid");
+        page.remove("theme");
+        let c: Config = serde_json::from_value(v).unwrap();
+        assert_eq!((c.pages[0].grid.clone(), c.pages[0].theme.clone()), (None, None));
     }
 
     #[test]

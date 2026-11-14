@@ -5,7 +5,7 @@ import type { Theme, ThemeInfo } from "../../shared/types";
 import * as api from "../api";
 import { fitsGrid } from "../editor/layout";
 import type { LoadedStore } from "../useConfigStore";
-import { SettingsScreen } from "./SettingsView";
+import { SettingsScreen, type SettingsSection } from "./SettingsView";
 import { windowsFlow, type WindowsFlowState } from "./windowsFlow";
 
 type T = ReturnType<typeof createT>;
@@ -14,7 +14,7 @@ const errorText = (t: T, code: unknown) => {
   return t(key) === key ? t("error.unknown") : t(key);
 };
 
-export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBack(): void }) {
+export function Settings({ store, t, startAt, onBack }: { store: LoadedStore; t: T; startAt?: SettingsSection; onBack(): void }) {
   const { config, commit, latest, saveError } = store;
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [previews, setPreviews] = useState<Record<string, Theme>>({});
@@ -49,7 +49,7 @@ export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBac
 
   return (
     <SettingsScreen
-      config={config} themes={themes} previews={previews} obs={store.status.obs} gridError={gridError}
+      startAt={startAt} config={config} themes={themes} previews={previews} obs={store.status.obs} gridError={gridError}
       themeError={themeError} confirmDeleteId={confirmId} t={t}
       windows={runtime.platform !== "windows" ? null : {
         ...win, elevated: runtime.elevated,
@@ -86,7 +86,8 @@ export function Settings({ store, t, onBack }: { store: LoadedStore; t: T; onBac
         setGrid: (cols, rows) => {
           const cur = latest() ?? config;
           const grid = { cols, rows };
-          if (!fitsGrid(cur.pages, grid)) { setGridError(true); return false; }
+          // Only pages without a grid of their own follow the default.
+          if (!fitsGrid(cur.pages.filter((pg) => !pg.grid), grid)) { setGridError(true); return false; }
           setGridError(false);
           commit({ ...cur, settings: { ...cur.settings, grid } });
           return true;

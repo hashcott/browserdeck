@@ -44,10 +44,10 @@ export function Inspector(p: InspectorProps) {
   const id = useId();
   if (!b) {
     return (
-      <aside className="right" aria-labelledby={`${id}h`}>
+      <section aria-labelledby={`${id}h`}>
         <h2 id={`${id}h`}>{t("editor.properties")}</h2>
         <p className="note">{t("editor.noSelection")}</p>
-      </aside>
+      </section>
     );
   }
   const set = (patch: Partial<Button>, slow = false) => p.onChange({ ...b, ...patch }, slow);
@@ -55,7 +55,7 @@ export function Inspector(p: InspectorProps) {
   const result = p.testResult?.id === b.id ? p.testResult : null;
 
   return (
-    <aside className="right" aria-labelledby={`${id}h`}>
+    <section aria-labelledby={`${id}h`}>
       <h2 id={`${id}h`}>{b.label || t(`action.${a.type}`)}</h2>
 
       <Field label={t("editor.label")} id={`${id}l`}>
@@ -152,8 +152,8 @@ export function Inspector(p: InspectorProps) {
           onKeyDown={(e) => e.key === "Escape" && p.onCancelDelete()}>
           <p>{t("editor.deleteConfirm")}</p>
           <div className="row">
-            <button type="button" className="btn danger" autoFocus onClick={p.onDelete}><Icon name="trash" size={18} />{t("common.delete")}</button>
-            <button type="button" className="btn ghost" onClick={p.onCancelDelete}>{t("common.cancel")}</button>
+            <button type="button" className="btn danger" onClick={p.onDelete}><Icon name="trash" size={18} />{t("common.delete")}</button>
+            <button type="button" className="btn ghost" autoFocus onClick={p.onCancelDelete}>{t("common.cancel")}</button>
           </div>
         </div>
       ) : (
@@ -165,7 +165,7 @@ export function Inspector(p: InspectorProps) {
       <div className="result" role="status" aria-live="polite">
         {result && <span className={result.ok ? "ok" : "bad"}><Icon name={result.ok ? "check" : "alert"} size={16} />{result.text}</span>}
       </div>
-    </aside>
+    </section>
   );
 }
 
