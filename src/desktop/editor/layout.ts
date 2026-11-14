@@ -1,6 +1,7 @@
-import type { Action, Button, Grid, Page } from "../../shared/types";
+import type { Action, Button, Grid, MediaOp, Page } from "../../shared/types";
 
-const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️", volume: "🔊", obs_scene: "🎬", usage: "📊" };
+const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️", volume: "🔊", obs_scene: "🎬", usage: "📊", media: "⏯️" };
+export const MEDIA_ICON: Record<MediaOp, string> = { previous: "⏮️", play_pause: "⏯️", next: "⏭️" };
 
 export function defaultAction(type: Action["type"]): Action {
   switch (type) {
@@ -9,11 +10,22 @@ export function defaultAction(type: Action["type"]): Action {
     case "volume": return { type, op: "up" };
     case "obs_scene": return { type, scene: "" };
     case "usage": return { type, metric: "cpu" };
+    case "media": return { type, op: "play_pause" };
   }
 }
 
 export function newButton(id: string, slot: number, action: Action): Button {
-  return { id, slot, label: "", icon: { kind: "emoji", value: EMOJI[action.type] }, color: null, action };
+  const value = action.type === "media" ? MEDIA_ICON[action.op] : EMOJI[action.type];
+  return { id, slot, label: "", icon: { kind: "emoji", value }, color: null, action };
+}
+
+/** What dropping an action on an empty slot creates. Media makes a player row (previous, play/pause, next)
+ *  when the two slots to its right, in the same row, are free too; otherwise a single play/pause key. */
+export function newButtons(page: Page, slot: number, type: Action["type"], grid: Grid, id: () => string): Button[] {
+  if (type !== "media") return [newButton(id(), slot, defaultAction(type))];
+  const free = (s: number) => s < grid.cols * grid.rows && !page.buttons.some((b) => b.slot === s);
+  if (slot % grid.cols > grid.cols - 3 || !free(slot + 1) || !free(slot + 2)) return [newButton(id(), slot, defaultAction(type))];
+  return (["previous", "play_pause", "next"] as const).map((op, i) => newButton(id(), slot + i, { type, op }));
 }
 
 /** An occupied slot returns the same page object. */

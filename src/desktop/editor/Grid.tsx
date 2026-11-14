@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { createT } from "../../shared/i18n";
-import { KeyFace, reading } from "../../shared/KeyFace";
+import { KeyFace, keyName, reading } from "../../shared/KeyFace";
 import type { ActionType, Button, Page, Theme } from "../../shared/types";
 import { ACTION_TYPES, ActionChip } from "./ActionPalette";
 import { Icon } from "./Icons";
@@ -93,7 +93,7 @@ function KeySlot(p: SlotCommon & { button: Button; theme: Theme; selected: boole
       data-slot={p.slot} style={{ gridColumn: (p.slot % p.cols) + 1, gridRow: Math.floor(p.slot / p.cols) + 1 }}>
       <button type="button" ref={drag.setNodeRef} {...drag.attributes} {...drag.listeners}
         className="key-btn" tabIndex={p.tabIndex} aria-pressed={p.selected}
-        aria-label={b.label || t(`action.${b.action.type}`)} aria-description={pos(t, p.slot, p.cols)}
+        aria-label={keyName(b, t)} aria-description={pos(t, p.slot, p.cols)}
         onFocus={p.onFocus}
         onClick={(e) => { e.stopPropagation(); p.onSelect(b.id); }}
         onKeyDown={(e) => {

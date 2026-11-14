@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Button, Page } from "../../shared/types";
-import { defaultAction, fitsGrid, moveButton, newButton, placeNew, removeButton, updateButton } from "./layout";
+import { defaultAction, fitsGrid, moveButton, newButton, newButtons, placeNew, removeButton, updateButton } from "./layout";
 
 const btn = (id: string, slot: number): Button => newButton(id, slot, defaultAction("volume"));
 const page = (...buttons: Button[]): Page => ({ id: "p", name: "P", buttons });
@@ -14,6 +14,19 @@ function deepFreeze<T>(o: T): T {
   return o;
 }
 
+test("media dropped with room to its right makes a player row; without room, one play/pause key", () => {
+  let n = 0;
+  const id = () => `m${n++}`;
+  const grid = { cols: 4, rows: 2 };
+  const row = newButtons(page(), 1, "media", grid, id);
+  expect(row.map((b) => [b.slot, b.action.type === "media" && b.action.op, b.icon])).toEqual([
+    [1, "previous", { kind: "emoji", value: "⏮️" }], [2, "play_pause", { kind: "emoji", value: "⏯️" }], [3, "next", { kind: "emoji", value: "⏭️" }],
+  ]);
+  const one = (p: Page, slot: number) => newButtons(p, slot, "media", grid, id).map((b) => b.slot);
+  expect(one(page(), 2)).toEqual([2]); // slot 4 is in the next row
+  expect(one(page(btn("x", 6)), 4)).toEqual([4]); // slot 6 taken
+  expect(newButtons(page(), 0, "volume", grid, id)).toHaveLength(1);
+});
 test("placeNew adds a button to an empty slot", () => {
   const p = placeNew(page(btn("a", 0)), 2, btn("b", 2));
   expect(p.buttons.map((b) => b.id)).toEqual(["a", "b"]);

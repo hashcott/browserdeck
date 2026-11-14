@@ -88,6 +88,7 @@ kbd { font: inherit; }
 .t-volume { --c: var(--c-volume); --on: var(--on-volume); }
 .t-obs_scene { --c: var(--c-obs_scene); --on: var(--on-obs_scene); }
 .t-usage { --c: var(--c-usage); --on: var(--on-usage); }
+.t-media { --c: var(--c-media); --on: var(--on-media); }
 .side-body .note { margin: 10px 8px 0; }
 .note { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--mute); }
 .overlay-chip { cursor: grabbing; width: 240px; background: var(--sel); box-shadow: 0 12px 28px -8px #000d; }

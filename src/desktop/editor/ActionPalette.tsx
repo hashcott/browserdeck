@@ -4,7 +4,7 @@ import type { ActionType } from "../../shared/types";
 import { Icon } from "./Icons";
 
 type T = ReturnType<typeof createT>;
-export const ACTION_TYPES: ActionType[] = ["launch", "hotkey", "volume", "obs_scene", "usage"];
+export const ACTION_TYPES: ActionType[] = ["launch", "hotkey", "volume", "media", "obs_scene", "usage"];
 
 /** The row's look, shared with the drag overlay. */
 export function ActionChip({ type, t }: { type: ActionType; t: T }) {

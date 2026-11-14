@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from "react";
-import { KeyFace, reading } from "../shared/KeyFace";
+import { KeyFace, keyName, reading } from "../shared/KeyFace";
 import { themeVars } from "../shared/theme";
 import type { Button, ServerMsg, Theme, Usage } from "../shared/types";
 import type { ConnStatus } from "./connection";
@@ -58,7 +58,7 @@ export function PhoneView(p: PhoneViewProps) {
 
   const face = (b: Button, cols: number, theme: Theme) => {
     const r = reading(b, p.usage ?? null, t);
-    const name = r ? `${b.label || r.name} ${r.value}` : b.label || t(`action.${b.action.type}`);
+    const name = r ? `${b.label || r.name} ${r.value}` : keyName(b, t);
     const id = b.id;
     return (
       <button

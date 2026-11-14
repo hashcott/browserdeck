@@ -33,10 +33,17 @@ pub struct ActionColors {
     /// Absent from themes made before usage keys existed.
     #[serde(default = "default_usage")]
     pub usage: String,
+    /// Absent from themes made before media keys existed.
+    #[serde(default = "default_media")]
+    pub media: String,
 }
 
 fn default_usage() -> String {
     "#4a7f86".into()
+}
+
+fn default_media() -> String {
+    "#a0413c".into()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -118,7 +125,7 @@ fn validate(t: &Theme) -> Result<(), ThemeError> {
         return Err(BadName);
     }
     let (a, k) = (&t.actions, &t.key);
-    let colours = [&t.ground, &t.ink, &a.launch, &a.hotkey, &a.volume, &a.obs_scene, &a.usage, &k.border_color];
+    let colours = [&t.ground, &t.ink, &a.launch, &a.hotkey, &a.volume, &a.obs_scene, &a.usage, &a.media, &k.border_color];
     if !colours.into_iter().all(|c| is_hex_color(c)) {
         return Err(BadColor);
     }
@@ -259,9 +266,16 @@ mod tests {
     }
 
     #[test]
-    fn a_theme_from_before_usage_keys_gets_the_default_colour() {
-        let j = json_with(|v| _ = v["actions"].as_object_mut().unwrap().remove("usage"));
-        assert_eq!(parse(&j).unwrap().actions.usage, "#4a7f86");
+    fn a_theme_from_before_usage_and_media_keys_gets_the_default_colours() {
+        let j = json_with(|v| {
+            let a = v["actions"].as_object_mut().unwrap();
+            a.remove("usage");
+            a.remove("media");
+        });
+        let t = parse(&j).unwrap();
+        assert_eq!((t.actions.usage.as_str(), t.actions.media.as_str()), ("#4a7f86", "#a0413c"));
+        let j = json_with(|v| v["actions"]["media"] = "red".into());
+        assert_eq!(parse(&j), Err(ThemeError::BadColor));
         let j = json_with(|v| v["actions"]["usage"] = "red".into());
         assert_eq!(parse(&j), Err(ThemeError::BadColor));
     }

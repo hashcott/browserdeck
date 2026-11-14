@@ -91,6 +91,15 @@ pub enum Action {
     ObsScene { scene: String },
     /// Shows a live reading on the phone; pressing it does nothing.
     Usage { metric: Metric },
+    Media { op: MediaOp },
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaOp {
+    PlayPause,
+    Next,
+    Previous,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

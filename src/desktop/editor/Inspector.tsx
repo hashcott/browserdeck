@@ -1,9 +1,11 @@
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
-import type { ActionType, Button, Metric, ObsState, VolumeOp } from "../../shared/types";
+import type { ActionType, Button, MediaOp, Metric, ObsState, VolumeOp } from "../../shared/types";
 import { keyInk } from "../../shared/theme";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
+import { MEDIA_ICON } from "./layout";
+import { keyName } from "../../shared/KeyFace";
 import { Icon } from "./Icons";
 import "../screens.css"; // .switch
 
@@ -35,6 +37,7 @@ export interface InspectorProps {
 
 const VOLUME: VolumeOp[] = ["up", "down", "mute"];
 const METRICS: Metric[] = ["cpu", "ram", "temp"];
+const MEDIA: MediaOp[] = ["play_pause", "previous", "next"];
 
 function Field({ label, children, id }: { label: string; children: ReactNode; id?: string }) {
   return <div className="fld"><label htmlFor={id}>{label}</label>{children}</div>;
@@ -57,7 +60,7 @@ export function Inspector(p: InspectorProps) {
 
   return (
     <section aria-labelledby={`${id}h`}>
-      <h2 id={`${id}h`}>{b.label || t(`action.${a.type}`)}</h2>
+      <h2 id={`${id}h`}>{keyName(b, t)}</h2>
 
       <Field label={t("editor.label")} id={`${id}l`}>
         <input id={`${id}l`} className="in" value={b.label} maxLength={40} onChange={(e) => set({ label: e.target.value }, true)} />
@@ -128,6 +131,22 @@ export function Inspector(p: InspectorProps) {
               </label>
             ))}
           </div>
+        </Field>
+      )}
+
+      {a.type === "media" && (
+        <Field label={t("action.media")}>
+          <div className="seg" role="radiogroup" aria-label={t("action.media")}>
+            {MEDIA.map((op) => (
+              <label key={op}>
+                <input type="radio" name={`${id}d`} checked={a.op === op}
+                  onChange={() => set({ action: { ...a, op }, // the default icon follows the choice; one the user set stays
+                    ...(b.icon.kind === "emoji" && b.icon.value === MEDIA_ICON[a.op] ? { icon: { kind: "emoji", value: MEDIA_ICON[op] } } : {}) })} />
+                <span>{t(`media.${op}`)}</span>
+              </label>
+            ))}
+          </div>
+          <p className="note">{t("editor.mediaHint")}</p>
         </Field>
       )}
 

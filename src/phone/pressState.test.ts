@@ -13,13 +13,14 @@ test("ids no longer in the layout are dropped; held and pending are merged", () 
   expect([...visiblePressed(new Set(["a", "gone"]), new Set(["b"]), layout(["a", "b"]), "open")].sort()).toEqual(["a", "b"]);
   expect(visiblePressed(new Set(["a"]), new Set(), null, "open").size).toBe(0);
 });
-test("non-volume keys ignore taps while pending; volume keys never do", () => {
+test("other keys ignore taps while pending; volume and media keys never do", () => {
   const pending = new Set(["k"]);
   expect(canFire("launch", "k", pending)).toBe(false);
   expect(canFire("hotkey", "k", pending)).toBe(false);
   expect(canFire("obs_scene", "k", pending)).toBe(false);
   expect(canFire("launch", "other", pending)).toBe(true);
   expect(canFire("volume", "k", pending)).toBe(true);
+  expect(canFire("media", "k", pending)).toBe(true);
 });
 test("connecting only before the first open; afterwards a drop stays 'closed'", () => {
   expect(displayStatus("connecting", false)).toBe("connecting");

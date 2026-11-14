@@ -8,8 +8,10 @@ export type Action =
   | { type: "hotkey"; keys: string[] }
   | { type: "volume"; op: VolumeOp }
   | { type: "obs_scene"; scene: string }
-  | { type: "usage"; metric: Metric };
+  | { type: "usage"; metric: Metric }
+  | { type: "media"; op: MediaOp };
 export type Metric = "cpu" | "ram" | "temp";
+export type MediaOp = "play_pause" | "next" | "previous";
 export type ActionType = Action["type"];
 
 export interface Button {
@@ -68,6 +70,7 @@ export interface ActionColors {
   volume: string;
   obs_scene: string;
   usage: string;
+  media: string;
 }
 export interface KeyStyle {
   /** % of the button side, 0..=50 */
@@ -101,7 +104,7 @@ export interface ThemeInfo {
 // Error codes: one const list per Rust enum, the union types are derived from them.
 export const ACTION_ERRORS = [
   "unknown_button", "file_not_found", "launch_failed", "invalid_hotkey", "blocked_by_elevated_window",
-  "volume_failed", "obs_not_connected", "obs_scene_missing", "obs_request_failed", "unsupported_platform",
+  "volume_failed", "obs_not_connected", "obs_scene_missing", "obs_request_failed", "media_failed", "unsupported_platform",
   "timeout",
 ] as const;
 export const CONFIG_ERRORS = [

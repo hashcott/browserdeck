@@ -16,6 +16,12 @@ export interface KeyFaceProps {
   reading?: { value: string; name: string };
 }
 
+/** What a key is called when it has no label: the action, or for volume and media keys the exact operation. */
+export function keyName(b: Button, t: (key: string) => string): string {
+  const a = b.action;
+  return b.label || (a.type === "volume" || a.type === "media" ? t(`${a.type}.${a.op}`) : t(`action.${a.type}`));
+}
+
 /** The reading for a usage key ("—" until the PC reports one); undefined for any other button. */
 export function reading(b: Button, usage: Usage | null, t: (key: string) => string): KeyFaceProps["reading"] {
   if (b.action.type !== "usage") return undefined;

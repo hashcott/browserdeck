@@ -4,7 +4,7 @@ import {
 } from "@dnd-kit/core";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { createT } from "../../shared/i18n";
-import { KeyFace } from "../../shared/KeyFace";
+import { KeyFace, keyName } from "../../shared/KeyFace";
 import { keyInk, themeVars } from "../../shared/theme";
 import type { ActionType, Button, Config, Grid as GridSize, ObsState, Status, Theme, ThemeInfo } from "../../shared/types";
 import { ACTION_TYPES, ActionChip, ActionPalette } from "./ActionPalette";
@@ -123,7 +123,7 @@ export function EditorView(p: EditorViewProps) {
   const dragName = (id: string) =>
     id.startsWith("new:") ? t(`action.${id.slice(4)}`) : (() => {
       const b = page.buttons.find((x) => x.id === id.slice(4));
-      return b ? b.label || t(`action.${b.action.type}`) : "";
+      return b ? keyName(b, t) : "";
     })();
 
   const onDragEnd = ({ active: a, over }: DragEndEvent) => {

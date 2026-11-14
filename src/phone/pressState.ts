@@ -14,9 +14,12 @@ export function visiblePressed(
   return new Set([...held, ...pending].filter((id) => ids.has(id)));
 }
 
-/** Volume keys stay unguarded so repeated taps all count; every other key waits for its pending press. */
+/** Volume and media keys are tapped in quick runs (louder, skip, skip), so every tap counts. */
+export const repeatable = (type: ActionType): boolean => type === "volume" || type === "media";
+
+/** Repeatable keys stay unguarded; every other key waits for its pending press. */
 export const canFire = (type: ActionType, id: string, pending: ReadonlySet<string>): boolean =>
-  type === "volume" || !pending.has(id);
+  repeatable(type) || !pending.has(id);
 
 /** "connecting" is only for the first connection; after that a drop reads "lost" until open again. */
 export function displayStatus(raw: ConnStatus, everOpen: boolean): ConnStatus {

@@ -7,6 +7,7 @@ const PATHS = {
   volume: <path d="M4 10v4h4l5 4V6l-5 4zM17 9a4 4 0 0 1 0 6" />,
   obs_scene: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
   usage: <path d="M3 12h4l3 7 4-14 3 7h4" />,
+  media: <path d="M4 6v12l8-6zM15 6v12M20 6v12" />,
   plus: <path d="M12 5v14M5 12h14" />,
   trash: <path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" />,
   pencil: <path d="M5 19l1-4L16 5l3 3L9 18zM14 7l3 3" />,

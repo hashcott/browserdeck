@@ -9,7 +9,7 @@ First public release.
 ### Added
 
 - Phone page: a grid of buttons in the phone's browser, paired by scanning a QR code that carries a secret code. One phone at a time; a second phone takes over and the first one is told.
-- Five button types: open an app (with arguments; choosing the program gives the key its icon), send a keyboard shortcut, change the system volume (up, down, mute), switch OBS scene (OBS 30.2 or newer, through its built-in WebSocket server), and system usage: the key shows CPU, RAM or temperature, updated every 2 seconds (temperature only where the PC exposes a sensor).
+- Six button types: open an app (with arguments; choosing the program gives the key its icon), send a keyboard shortcut, change the system volume (up, down, mute), media keys (previous, play/pause, next; dropping Media on a slot with room makes all three in a row), switch OBS scene (OBS 30.2 or newer, through its built-in WebSocket server), and system usage: the key shows CPU, RAM or temperature, updated every 2 seconds (temperature only where the PC exposes a sensor).
 - Desktop editor: drag actions onto the grid, drag buttons to reorder, set label, emoji or image icon and colour. Several pages, as tabs, each with its own theme and grid size or the defaults. Edits reach the phone at once.
 - Four built-in button themes and importable JSON themes ([docs/themes.md](docs/themes.md)).
 - English and Vietnamese, following the system and browser language or chosen in Settings.

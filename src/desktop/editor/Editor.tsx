@@ -6,7 +6,7 @@ import type { ActionType, Button, Grid, ObsState, Theme, ThemeInfo } from "../..
 import * as api from "../api";
 import { EditorView, type Confirm, type EditorHandlers, type Notice } from "./EditorView";
 import type { TestResult } from "./Inspector";
-import { defaultAction, fitsGrid, moveButton, newButton, placeNew, removeButton, updateButton } from "./layout";
+import { fitsGrid, moveButton, newButtons, placeNew, removeButton, updateButton } from "./layout";
 import type { LoadedStore } from "../useConfigStore";
 
 const IMAGE_EXT = ["png", "jpg", "jpeg", "webp"];
@@ -110,9 +110,10 @@ export function Editor({ store, t, onPair, onObsSettings, showToast }: EditorPro
     createAt: (slot, type: ActionType) => {
       const cur = latest()?.pages.find((x) => x.id === pageId) ?? latest()?.pages[0];
       if (cur?.buttons.some((x) => x.slot === slot)) { showToast(t("editor.slotTaken")); return; }
-      const b = newButton(crypto.randomUUID(), slot, defaultAction(type));
-      withPage((pg) => placeNew(pg, slot, b));
-      setSelectedId(b.id); setConfirm(null); focusOn(slot);
+      if (!cur) return;
+      const made = newButtons(cur, slot, type, cur.grid ?? latest()!.settings.grid, () => crypto.randomUUID());
+      withPage((pg) => made.reduce((p, b) => placeNew(p, b.slot, b), pg));
+      setSelectedId(made[0].id); setConfirm(null); focusOn(slot);
     },
     moveTo: (id, slot) => {
       const cur = latest()?.pages.find((x) => x.id === pageId) ?? latest()?.pages[0];

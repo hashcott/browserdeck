@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createT, resolveLang } from "../shared/i18n";
 import { createConnection, type ConnStatus } from "./connection";
 import { PhoneView, type Layout } from "./PhoneView";
-import { canFire, displayStatus, visiblePressed } from "./pressState";
+import { canFire, displayStatus, repeatable, visiblePressed } from "./pressState";
 import type { Usage } from "../shared/types";
 
 const ERROR_MS = 4000;
@@ -57,7 +57,7 @@ export function PhoneApp() {
   const onPress = useCallback(async (id: string) => {
     const type = layoutRef.current?.pages.flatMap((pg) => pg.buttons).find((b) => b.id === id)?.action.type;
     if (!type || !canFire(type, id, pendingRef.current)) return;
-    const guarded = type !== "volume"; // volume presses may overlap, so they are never marked pending
+    const guarded = !repeatable(type); // repeatable presses may overlap, so they are never marked pending
     if (guarded) { pendingRef.current = toggle(pendingRef.current, id, true); setPending(pendingRef.current); }
     const r = await conn.current?.press(id);
     if (guarded) { pendingRef.current = toggle(pendingRef.current, id, false); setPending(pendingRef.current); }

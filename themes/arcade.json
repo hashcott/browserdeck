@@ -10,7 +10,8 @@
     "hotkey": "#ffd400",
     "volume": "#19c37d",
     "obs_scene": "#ff4040",
-    "usage": "#a259ff"
+    "usage": "#a259ff",
+    "media": "#ff8c1a"
   },
   "key": {
     "radius": 17,

@@ -26,7 +26,7 @@
 
 Browserdeck chạy trên máy Windows cạnh OBS. App hiện một lưới nút trên điện thoại (hoặc điện thoại, máy tính bảng cũ) qua WiFi nhà bạn. Bấm nút trên điện thoại thì máy tính làm việc tương ứng.
 
-- **Năm loại nút:** mở app, gửi phím tắt, đổi âm lượng hệ thống (tăng, giảm, tắt tiếng), chuyển scene OBS, và nút hiện trực tiếp CPU, RAM hoặc nhiệt độ máy.
+- **Sáu loại nút:** mở app, gửi phím tắt, đổi âm lượng hệ thống (tăng, giảm, tắt tiếng), điều khiển media (bài trước, phát/dừng, bài sau, cho YouTube, Spotify hay thứ đang phát), chuyển scene OBS, và nút hiện trực tiếp CPU, RAM hoặc nhiệt độ máy.
 - **Không cần app điện thoại:** chỉ cần trình duyệt. Quét mã QR là có nút.
 - **Chỉnh trên máy tính:** kéo hành động vào lưới, kéo nút để đổi chỗ, chọn nhãn, emoji hoặc ảnh, và màu. Điện thoại cập nhật ngay.
 - **Nhiều trang** nút, **bốn theme nút** (hoặc [tự làm theme](docs/themes.md)). Mỗi trang có thể có theme và kích thước lưới riêng.

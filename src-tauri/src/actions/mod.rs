@@ -1,6 +1,7 @@
 pub mod hotkey;
 pub mod keymap;
 pub mod launch;
+pub mod media;
 pub mod obs;
 pub mod volume;
 
@@ -20,6 +21,7 @@ pub enum ActionError {
     ObsNotConnected,
     ObsSceneMissing,
     ObsRequestFailed,
+    MediaFailed,
     UnsupportedPlatform,
     Timeout,
 }
@@ -86,6 +88,12 @@ impl Executor for SystemExecutor {
             }
             Action::ObsScene { scene } => self.obs.set_scene(scene).await,
             Action::Usage { .. } => Ok(()),
+            Action::Media { op } => {
+                let op = *op;
+                tokio::task::spawn_blocking(move || media::media(op))
+                    .await
+                    .unwrap_or(Err(ActionError::MediaFailed))
+            }
         }
     }
 }
