@@ -1,4 +1,5 @@
 pub mod actions;
+mod app_icon;
 pub mod admin_token;
 pub mod auth;
 pub mod autostart;
@@ -11,6 +12,7 @@ pub mod server;
 pub mod state;
 mod themes;
 pub mod tray;
+pub mod usage;
 
 use commands::SystemSettingError;
 use state::{AppState, CoreEvent, EventSink};
@@ -69,6 +71,7 @@ fn build_state(app: &tauri::App) -> Result<Arc<AppState>, Box<dyn std::error::Er
             Err(code) => state.startup.server_error = Some(code),
         }
         let state = Arc::new(state);
+        usage::spawn(state.clone());
         if let Ok((listener, _)) = bound {
             let router = server::router(state.clone());
             tauri::async_runtime::spawn(async move {
@@ -152,6 +155,7 @@ pub fn run() {
             commands::test_button,
             commands::obs_scenes,
             commands::import_icon,
+            commands::app_icon,
             commands::list_themes,
             commands::get_theme,
             commands::import_theme,

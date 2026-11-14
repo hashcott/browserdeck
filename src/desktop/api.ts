@@ -22,6 +22,8 @@ export const testButton = (buttonId: string) => invoke<void>("test_button", { bu
 export const obsScenes = () => invoke<string[]>("obs_scenes");
 /** Copies the file at `path` into the icons folder; resolves with the stored file name. Rejects with an IconError code. */
 export const importIcon = (path: string) => invoke<string>("import_icon", { path });
+/** The icon of the file a launch button opens, stored as an icon file. */
+export const appIcon = (path: string) => invoke<string>("app_icon", { path });
 export const listThemes = () => invoke<ThemeInfo[]>("list_themes");
 export const getTheme = (id: string) => invoke<Theme>("get_theme", { id });
 /** Rejects with a ThemeError code. */

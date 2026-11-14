@@ -37,6 +37,7 @@
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 90ms ease-out;
 }
 .key-icon { font-size: max(22px, 30cqw); line-height: 1; flex: none; width: max-content; max-width: 100%; }
+.key-value { font-weight: 800; font-size: max(18px, 24cqw); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
 img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; object-fit: contain; }
 .key-label {
   font-weight: 800;
@@ -94,8 +95,9 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
 /* Tiny keys: not enough room for icon and label, so the icon alone, centred (the caller's button carries the name). */
 @container (max-width: 72px) {
   .key-face[class] .key-cap { padding: 6cqw; align-items: center; justify-content: center; }
-  .key-icon ~ .key-label { display: none; }
+  .key-icon ~ .key-label, .key-value ~ .key-label { display: none; }
   .key-icon { font-size: 52cqw; }
+  .key-value { font-size: 30cqw; }
   img.key-icon { width: 52cqw; height: 52cqw; }
 }
 

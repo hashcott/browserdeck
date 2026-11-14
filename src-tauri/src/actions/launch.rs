@@ -92,9 +92,19 @@ fn shell_execute_via_explorer(verb: &str, file: &Path, params: &str, dir: Option
     }
 }
 
-/// Not Windows: never elevated, so always direct, and there is no "runas".
+/// Not Windows: never elevated, so always direct, and there is no "runas". On macOS an app bundle or a document goes
+/// through `open`, as a double-click in Finder would; it returns once the app is launched, so its failure is reported.
 #[cfg(not(windows))]
 fn open(_route: Route, _verb: &str, path: &Path, args: &[String]) -> io::Result<()> {
+    if cfg!(target_os = "macos") && !is_program(path) {
+        let mut command = std::process::Command::new("open");
+        command.arg(path);
+        if !args.is_empty() {
+            command.arg("--args").args(args);
+        }
+        let status = command.stdin(std::process::Stdio::null()).status()?;
+        return if status.success() { Ok(()) } else { Err(io::Error::other("open failed")) };
+    }
     let mut command = std::process::Command::new(path);
     command.args(args);
     if let Some(dir) = work_dir(path) {
@@ -103,6 +113,13 @@ fn open(_route: Route, _verb: &str, path: &Path, args: &[String]) -> io::Result<
     let mut child = command.spawn()?;
     std::thread::spawn(move || child.wait()); // reap it so it never lingers as a zombie
     Ok(())
+}
+
+/// A plain file with an execute bit: run it directly. An `.app` bundle is a folder, so it is not one.
+#[cfg(unix)]
+fn is_program(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
 }
 
 /// Runs `ShellExecuteW`; a result of 32 or less is the shell's error code.
@@ -170,6 +187,22 @@ mod tests {
     #[test]
     fn missing_file_is_file_not_found() {
         assert_eq!(launch("/definitely/not/here.exe", &[], false), Err(ActionError::FileNotFound));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_a_plain_executable_counts_as_a_program() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let app = dir.path().join("Some.app");
+        std::fs::create_dir(&app).unwrap();
+        let (bin, doc) = (dir.path().join("tool"), dir.path().join("notes.txt"));
+        std::fs::write(&bin, "").unwrap();
+        std::fs::write(&doc, "").unwrap();
+        std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(is_program(&bin));
+        assert!(!is_program(&app));
+        assert!(!is_program(&doc));
     }
 
     #[test]

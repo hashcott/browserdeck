@@ -89,6 +89,16 @@ pub enum Action {
     Hotkey { keys: Vec<String> },
     Volume { op: VolumeOp },
     ObsScene { scene: String },
+    /// Shows a live reading on the phone; pressing it does nothing.
+    Usage { metric: Metric },
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Metric {
+    Cpu,
+    Ram,
+    Temp,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]

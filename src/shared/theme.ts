@@ -25,6 +25,7 @@ export function themeVars(theme: Theme): Record<string, string> {
     "--c-hotkey": hex(theme.actions.hotkey, "#2c3a55"),
     "--c-volume": hex(theme.actions.volume, "#6f7d4f"),
     "--c-obs_scene": hex(theme.actions.obs_scene, "#e8703a"),
+    "--c-usage": hex(theme.actions.usage, "#4a7f86"),
   };
 }
 

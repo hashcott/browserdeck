@@ -1,4 +1,4 @@
-import type { ActionError, ClientMsg, ServerMsg } from "../shared/types";
+import type { ActionError, ClientMsg, ServerMsg, Usage } from "../shared/types";
 
 export type ConnStatus = "connecting" | "open" | "closed" | "kicked";
 export type PressOutcome = { ok: true } | { ok: false; error: ActionError | "timeout" };
@@ -17,6 +17,9 @@ const globalTimers: Timers = {
 export function createConnection(opts: {
   url: string;
   onLayout: (m: Extract<ServerMsg, { type: "layout" }>) => void;
+  onUsage?: (m: Usage) => void;
+  /** The app now serves a newer phone page than this one: reload. */
+  onNewBuild?: () => void;
   onStatus: (s: ConnStatus) => void;
   WebSocketImpl?: typeof WebSocket; // injected in tests
   timers?: Timers; // injected in tests
@@ -29,6 +32,7 @@ export function createConnection(opts: {
   let delay = BACKOFF_START_MS;
   let retry: unknown;
   let stopped = false;
+  let build: string | null = null; // this page's build: the first one the app reports
 
   const failAll = () => {
     for (const resolve of [...pending.values()]) resolve({ ok: false, error: "timeout" });
@@ -45,7 +49,16 @@ export function createConnection(opts: {
     s.onmessage = (e) => {
       let m: ServerMsg;
       try { m = JSON.parse(e.data as string) as ServerMsg; } catch { return; }
-      if (m.type === "layout") opts.onLayout(m);
+      if (m.type === "layout") {
+        if (build !== null && m.build !== build) {
+          stopped = true;
+          opts.onNewBuild?.();
+          return;
+        }
+        build = m.build;
+        opts.onLayout(m);
+      }
+      else if (m.type === "usage") opts.onUsage?.(m);
       else if (m.type === "result") pending.get(m.press_id)?.(m.ok ? { ok: true } : { ok: false, error: m.error ?? "timeout" });
       else if (m.type === "kicked") {
         stopped = true;

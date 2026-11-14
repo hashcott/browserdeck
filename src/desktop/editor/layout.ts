@@ -1,6 +1,6 @@
 import type { Action, Button, Grid, Page } from "../../shared/types";
 
-const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️", volume: "🔊", obs_scene: "🎬" };
+const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️", volume: "🔊", obs_scene: "🎬", usage: "📊" };
 
 export function defaultAction(type: Action["type"]): Action {
   switch (type) {
@@ -8,6 +8,7 @@ export function defaultAction(type: Action["type"]): Action {
     case "hotkey": return { type, keys: [] };
     case "volume": return { type, op: "up" };
     case "obs_scene": return { type, scene: "" };
+    case "usage": return { type, metric: "cpu" };
   }
 }
 

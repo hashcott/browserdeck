@@ -3,11 +3,13 @@ import { createT, resolveLang } from "../shared/i18n";
 import { createConnection, type ConnStatus } from "./connection";
 import { PhoneView, type Layout } from "./PhoneView";
 import { canFire, displayStatus, visiblePressed } from "./pressState";
+import type { Usage } from "../shared/types";
 
 const ERROR_MS = 4000;
 
 export function PhoneApp() {
   const [layout, setLayout] = useState<Layout | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [rawStatus, setRawStatus] = useState<ConnStatus>("connecting");
   const [everOpen, setEverOpen] = useState(false);
   const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
@@ -21,6 +23,8 @@ export function PhoneApp() {
   useEffect(() => {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const c = createConnection({ url: `${proto}//${location.host}/ws`, onLayout: (m) => { layoutRef.current = m; setHeld(new Set()); setLayout(m); },
+      onUsage: setUsage,
+      onNewBuild: () => location.reload(),
       onStatus: (s) => {
         if (s === "open") setEverOpen(true);
         if (s !== "open") setHeld(new Set()); // a disabled key may never deliver pointerup
@@ -66,6 +70,7 @@ export function PhoneApp() {
   return (
     <PhoneView
       layout={layout}
+      usage={usage}
       status={status}
       pressed={visiblePressed(held, pending, layout, status)}
       errors={errors}

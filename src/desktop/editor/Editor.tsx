@@ -158,6 +158,9 @@ export function Editor({ store, t, onPair, onObsSettings, showToast }: EditorPro
         const path = await open({ multiple: false });
         if (typeof path !== "string") return;
         patchButton(id, (b) => (b.action.type === "launch" ? { ...b, action: { ...b.action, path } } : b));
+        // The key takes the program's own icon; without one it keeps what it has.
+        const file = await api.appIcon(path).catch(() => null);
+        if (file) patchButton(id, (b) => (b.action.type === "launch" && b.action.path === path ? { ...b, icon: { kind: "image", file } } : b));
       } catch (e) { showError(e); }
     },
     setPageGrid: (grid: Grid | null) => {

@@ -30,6 +30,13 @@ pub struct ActionColors {
     pub hotkey: String,
     pub volume: String,
     pub obs_scene: String,
+    /// Absent from themes made before usage keys existed.
+    #[serde(default = "default_usage")]
+    pub usage: String,
+}
+
+fn default_usage() -> String {
+    "#4a7f86".into()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -111,7 +118,7 @@ fn validate(t: &Theme) -> Result<(), ThemeError> {
         return Err(BadName);
     }
     let (a, k) = (&t.actions, &t.key);
-    let colours = [&t.ground, &t.ink, &a.launch, &a.hotkey, &a.volume, &a.obs_scene, &k.border_color];
+    let colours = [&t.ground, &t.ink, &a.launch, &a.hotkey, &a.volume, &a.obs_scene, &a.usage, &k.border_color];
     if !colours.into_iter().all(|c| is_hex_color(c)) {
         return Err(BadColor);
     }
@@ -249,6 +256,14 @@ mod tests {
         for t in builtins() {
             assert_eq!(parse(&serde_json::to_string(&t).unwrap()), Ok(t));
         }
+    }
+
+    #[test]
+    fn a_theme_from_before_usage_keys_gets_the_default_colour() {
+        let j = json_with(|v| _ = v["actions"].as_object_mut().unwrap().remove("usage"));
+        assert_eq!(parse(&j).unwrap().actions.usage, "#4a7f86");
+        let j = json_with(|v| v["actions"]["usage"] = "red".into());
+        assert_eq!(parse(&j), Err(ThemeError::BadColor));
     }
 
     #[test]

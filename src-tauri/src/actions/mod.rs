@@ -85,6 +85,7 @@ impl Executor for SystemExecutor {
                     .unwrap_or(Err(ActionError::InvalidHotkey))
             }
             Action::ObsScene { scene } => self.obs.set_scene(scene).await,
+            Action::Usage { .. } => Ok(()),
         }
     }
 }

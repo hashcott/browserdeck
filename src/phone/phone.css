@@ -43,13 +43,25 @@ body { -webkit-text-size-adjust: 100%; }
 .slide { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: grid; place-items: center; min-width: 0; background: var(--ground, #22252b); }
 
 /* Keys stretch to fill the stage, between 4:5 and 5:4 (width:height) either way, never rotated:
-   the grid is as wide and tall as the stage allows without any key passing those caps. */
+   the grid is as wide and tall as the stage allows without any key passing those caps.
+   --gc and --gr are the columns and rows as drawn: a grid whose shape goes against the screen's is turned
+   (rows become columns), so a tall grid fills a landscape phone and a wide one a portrait phone. Keys stay in their groups. */
 .deck-grid {
-  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows) * 1.25));
-  height: min(100cqh, calc(100cqw * var(--rows) / var(--cols) * 1.25));
+  --gc: var(--cols); --gr: var(--rows);
+  width: min(100cqw, calc(100cqh * var(--gc) / var(--gr) * 1.25));
+  height: min(100cqh, calc(100cqw * var(--gr) / var(--gc) * 1.25));
   display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
-  grid-template-rows: repeat(var(--rows), 1fr);
+  grid-template-columns: repeat(var(--gc), 1fr);
+  grid-template-rows: repeat(var(--gr), 1fr);
+}
+.deck-grid .key-btn { grid-column: var(--x); grid-row: var(--y); }
+@container (orientation: landscape) {
+  .deck-grid.tall { --gc: var(--rows); --gr: var(--cols); }
+  .deck-grid.tall .key-btn { grid-column: var(--y); grid-row: var(--x); }
+}
+@container (orientation: portrait) {
+  .deck-grid.wide { --gc: var(--rows); --gr: var(--cols); }
+  .deck-grid.wide .key-btn { grid-column: var(--y); grid-row: var(--x); }
 }
 /* The button is the whole cell (the tap target); the gap lives in its padding. */
 .key-btn {

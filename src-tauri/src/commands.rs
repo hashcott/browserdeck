@@ -253,6 +253,10 @@ pub async fn import_icon_file(state: &AppState, source: &Path) -> Result<String,
     if !magic_matches(&ext, &bytes) {
         return Err(IconError::BadType);
     }
+    store_icon(state, &bytes, &ext).await
+}
+
+async fn store_icon(state: &AppState, bytes: &[u8], ext: &str) -> Result<String, IconError> {
     let dir = state.data_dir.join("icons");
     tokio::fs::create_dir_all(&dir).await.map_err(|_| IconError::Io)?;
     let name = format!("{}.{ext}", uuid::Uuid::new_v4());
@@ -335,6 +339,20 @@ pub async fn obs_scenes(state: St<'_>) -> Result<Vec<String>, ActionError> {
 #[tauri::command]
 pub async fn import_icon(state: St<'_>, path: String) -> Result<String, IconError> {
     import_icon_file(&state, Path::new(&path)).await
+}
+
+/// The icon of the file a launch button opens, stored like an imported icon. BadType: none could be read.
+#[tauri::command]
+pub async fn app_icon(state: St<'_>, path: String) -> Result<String, IconError> {
+    let png = tokio::task::spawn_blocking(move || crate::app_icon::png(Path::new(&path)))
+        .await
+        .ok()
+        .flatten()
+        .ok_or(IconError::BadType)?;
+    if png.len() as u64 > MAX_ICON_BYTES {
+        return Err(IconError::TooLarge);
+    }
+    store_icon(&state, &png, "png").await
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
-import type { ActionType, Button, ObsState, VolumeOp } from "../../shared/types";
+import type { ActionType, Button, Metric, ObsState, VolumeOp } from "../../shared/types";
 import { keyInk } from "../../shared/theme";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
@@ -34,6 +34,7 @@ export interface InspectorProps {
 }
 
 const VOLUME: VolumeOp[] = ["up", "down", "mute"];
+const METRICS: Metric[] = ["cpu", "ram", "temp"];
 
 function Field({ label, children, id }: { label: string; children: ReactNode; id?: string }) {
   return <div className="fld"><label htmlFor={id}>{label}</label>{children}</div>;
@@ -62,7 +63,7 @@ export function Inspector(p: InspectorProps) {
         <input id={`${id}l`} className="in" value={b.label} maxLength={40} onChange={(e) => set({ label: e.target.value }, true)} />
       </Field>
 
-      <Field label={t("editor.icon")} id={`${id}i`}>
+      {a.type !== "usage" && <Field label={t("editor.icon")} id={`${id}i`}>
         <div className="icon-row">
           {b.icon.kind === "image" && p.iconSrc && <img className="icon-prev" src={p.iconSrc} alt="" />}
           <input id={`${id}i`} className="in emoji" value={b.icon.kind === "emoji" ? b.icon.value : ""} maxLength={16}
@@ -70,7 +71,7 @@ export function Inspector(p: InspectorProps) {
             onChange={(e) => set({ icon: { kind: "emoji", value: e.target.value } }, true)} />
           <button type="button" className="btn small" onClick={p.onPickImage}><Icon name="image" size={16} />{t("editor.iconPick")}</button>
         </div>
-      </Field>
+      </Field>}
 
       <Field label={t("editor.color")}>
         <div className="color-row">
@@ -130,6 +131,20 @@ export function Inspector(p: InspectorProps) {
         </Field>
       )}
 
+      {a.type === "usage" && (
+        <Field label={t("action.usage")}>
+          <div className="seg" role="radiogroup" aria-label={t("action.usage")}>
+            {METRICS.map((metric) => (
+              <label key={metric}>
+                <input type="radio" name={`${id}m`} checked={a.metric === metric} onChange={() => set({ action: { ...a, metric } })} />
+                <span>{t(`usage.${metric}`)}</span>
+              </label>
+            ))}
+          </div>
+          <p className="note">{t("editor.usageHint")}</p>
+        </Field>
+      )}
+
       {a.type === "obs_scene" && (
         <Field label={t("action.obs_scene")} id={`${id}s`}>
           {p.obs === "connected" ? (
@@ -158,7 +173,7 @@ export function Inspector(p: InspectorProps) {
         </div>
       ) : (
         <div className="row">
-          <button type="button" className="btn cta" disabled={p.testing} onClick={p.onTest}><Icon name="play" size={16} />{t("common.test")}</button>
+          {a.type !== "usage" && <button type="button" className="btn cta" disabled={p.testing} onClick={p.onTest}><Icon name="play" size={16} />{t("common.test")}</button>}
           <button type="button" className="btn ghost danger-text" onClick={p.onAskDelete}><Icon name="trash" size={18} />{t("common.delete")}</button>
         </div>
       )}

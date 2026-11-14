@@ -143,9 +143,21 @@ fn file_response(name: &str, bytes: Vec<u8>) -> Response {
     ([(header::CONTENT_TYPE, HeaderValue::from_static(content_type(name)))], bytes).into_response()
 }
 
+/// Changes whenever the phone page is rebuilt (an app update); an open phone reloads when it sees a new one.
+pub fn phone_build() -> String {
+    Dist::get("phone.html")
+        .map(|f| f.metadata.sha256_hash()[..6].iter().map(|b| format!("{b:02x}")).collect())
+        .unwrap_or_default()
+}
+
 async fn index() -> Response {
     match Dist::get("phone.html") {
-        Some(f) => file_response("phone.html", f.data.into_owned()),
+        // no-cache: a reload after an update must get the new page, not a stored copy.
+        Some(f) => (
+            [(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"))],
+            file_response("phone.html", f.data.into_owned()),
+        )
+            .into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }

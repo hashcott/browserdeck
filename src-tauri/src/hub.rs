@@ -10,8 +10,11 @@ use tokio::sync::mpsc;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMsg {
     /// `grid` and `theme` are the defaults; every page carries the grid and theme it is drawn with.
-    Layout { pages: Vec<LayoutPage>, grid: Grid, language: String, theme: Theme },
+    /// `build` identifies the phone page this app serves.
+    Layout { pages: Vec<LayoutPage>, grid: Grid, language: String, theme: Theme, build: String },
     Result { press_id: u64, ok: bool, error: Option<ActionError> },
+    /// Every few seconds while a page has a usage key.
+    Usage(crate::usage::Usage),
     Kicked,
 }
 
@@ -47,7 +50,8 @@ pub async fn layout_msg(state: &AppState) -> ServerMsg {
             theme: p.theme.as_deref().map_or_else(|| theme.clone(), |id| themes::resolve(&state.data_dir, id)),
         })
         .collect();
-    ServerMsg::Layout { pages, grid: c.settings.grid.clone(), language: c.settings.language.clone(), theme }
+    let (grid, language) = (c.settings.grid.clone(), c.settings.language.clone());
+    ServerMsg::Layout { pages, grid, language, theme, build: crate::server::phone_build() }
 }
 
 /// At most one phone at a time: a new connection kicks the old one.

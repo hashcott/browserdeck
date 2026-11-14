@@ -9,7 +9,8 @@
     "launch": "#f6f1e4",
     "hotkey": "#2c3a55",
     "volume": "#6f7d4f",
-    "obs_scene": "#e8703a"
+    "obs_scene": "#e8703a",
+    "usage": "#4a7f86"
   },
   "key": {
     "radius": 9,

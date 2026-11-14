@@ -95,9 +95,22 @@ test("does not reconnect after kicked", () => {
 });
 test("layout messages reach onLayout", () => {
   make(); last().open();
-  const m = { type: "layout", pages: [], grid: { cols: 3, rows: 4 }, language: "auto", theme: {} };
+  const m = { type: "layout", pages: [], grid: { cols: 3, rows: 4 }, language: "auto", theme: {}, build: "a" };
   last().recv(m);
   expect(layouts).toEqual([m]);
+});
+test("a layout from a newer app build asks for a reload instead of drawing it", () => {
+  let reloads = 0;
+  createConnection({ url: "ws://h/ws", onLayout: (m) => layouts.push(m), onStatus: (s) => statuses.push(s), onNewBuild: () => reloads++,
+    WebSocketImpl: FakeWS as unknown as typeof WebSocket });
+  const m = { type: "layout", pages: [], grid: { cols: 3, rows: 4 }, language: "auto", theme: {}, build: "a" };
+  last().open(); last().recv(m);
+  last().drop(); vi.advanceTimersByTime(1000); last().open(); last().recv(m); // same app after a reconnect: drawn
+  expect([layouts.length, reloads]).toEqual([2, 0]);
+  last().recv({ ...m, build: "b" }); // updated app
+  expect([layouts.length, reloads]).toEqual([2, 1]);
+  last().drop(); vi.advanceTimersByTime(60000);
+  expect(FakeWS.all).toHaveLength(2); // no reconnect while the page reloads
 });
 test("close() stops reconnecting", () => {
   const c = make(); last().open(); c.close();

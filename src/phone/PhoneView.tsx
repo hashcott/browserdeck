@@ -1,13 +1,15 @@
 import { useRef, useState, type CSSProperties } from "react";
-import { KeyFace } from "../shared/KeyFace";
+import { KeyFace, reading } from "../shared/KeyFace";
 import { themeVars } from "../shared/theme";
-import type { Button, ServerMsg, Theme } from "../shared/types";
+import type { Button, ServerMsg, Theme, Usage } from "../shared/types";
 import type { ConnStatus } from "./connection";
 import "./phone.css";
 
 export type Layout = Extract<ServerMsg, { type: "layout" }>;
 export interface PhoneViewProps {
   layout: Layout | null;
+  /** The latest usage sample, for usage keys. */
+  usage?: Usage | null;
   status: ConnStatus;
   /** Buttons currently held down. */
   pressed: ReadonlySet<string>;
@@ -55,7 +57,8 @@ export function PhoneView(p: PhoneViewProps) {
   };
 
   const face = (b: Button, cols: number, theme: Theme) => {
-    const name = b.label || t(`action.${b.action.type}`);
+    const r = reading(b, p.usage ?? null, t);
+    const name = r ? `${b.label || r.name} ${r.value}` : b.label || t(`action.${b.action.type}`);
     const id = b.id;
     return (
       <button
@@ -64,7 +67,7 @@ export function PhoneView(p: PhoneViewProps) {
         className="key-btn"
         aria-label={name}
         disabled={!open}
-        style={{ gridColumn: (b.slot % cols) + 1, gridRow: Math.floor(b.slot / cols) + 1 }}
+        style={{ "--x": (b.slot % cols) + 1, "--y": Math.floor(b.slot / cols) + 1 } as CSSProperties}
         onPointerDown={() => p.onDown(id)}
         onPointerUp={() => p.onUp(id)}
         onPointerCancel={() => p.onUp(id)}
@@ -75,6 +78,7 @@ export function PhoneView(p: PhoneViewProps) {
           button={b}
           theme={theme}
           iconSrc={b.icon.kind === "image" ? `/icons/${encodeURIComponent(b.icon.file)}` : undefined}
+          reading={r}
           pressed={p.pressed.has(id)}
           error={p.errors.some(([e]) => e === id)}
           disabled={!open}
@@ -96,12 +100,15 @@ export function PhoneView(p: PhoneViewProps) {
             onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / (e.currentTarget.clientWidth || 1)))}
           >
             {pages.map((pg) => {
-              const cols = int(pg.grid?.cols, 3), rows = int(pg.grid?.rows, 4);
+              const cols = int(pg.grid?.cols, 3);
+              const keys = pg.buttons.filter((b) => b.slot >= 0 && b.slot < cols * int(pg.grid?.rows, 4));
+              // Empty rows after the last key are left out, so the keys sit centred instead of above a blank band.
+              const rows = Math.max(1, ...keys.map((b) => Math.floor(b.slot / cols) + 1));
               const theme = pg.theme ?? layout!.theme;
               return (
                 <section key={pg.id} className="slide" style={themeVars(theme) as CSSProperties}>
-                  <div className="deck-grid" style={{ "--cols": cols, "--rows": rows } as CSSProperties}>
-                    {pg.buttons.filter((b) => b.slot >= 0 && b.slot < cols * rows).map((b) => face(b, cols, theme))}
+                  <div className={`deck-grid${rows > cols ? " tall" : cols > rows ? " wide" : ""}`} style={{ "--cols": cols, "--rows": rows } as CSSProperties}>
+                    {keys.map((b) => face(b, cols, theme))}
                   </div>
                 </section>
               );

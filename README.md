@@ -31,7 +31,7 @@
 
 Browserdeck runs on your Windows PC next to OBS. It shows a grid of buttons on your phone (or an old phone or tablet) over your home WiFi. Press a button on the phone and the PC does the action.
 
-- **Four button types:** open an app, send a keyboard shortcut, change the system volume (up, down, mute), switch OBS scene.
+- **Five button types:** open an app, send a keyboard shortcut, change the system volume (up, down, mute), switch OBS scene, and a live system reading (CPU, RAM or temperature) shown on the key.
 - **No phone app:** the phone only needs a browser. Scan a QR code and the buttons are there.
 - **Set up on the PC:** drag actions onto the grid, drag buttons to reorder them, pick a label, an emoji or image, and a colour. Changes show on the phone at once.
 - **Several pages** of buttons, and **four button themes** (or [make your own](docs/themes.md)). Each page can have its own theme and grid size.

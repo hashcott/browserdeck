@@ -7,7 +7,9 @@ export type Action =
   | { type: "launch"; path: string; args: string[]; admin: boolean }
   | { type: "hotkey"; keys: string[] }
   | { type: "volume"; op: VolumeOp }
-  | { type: "obs_scene"; scene: string };
+  | { type: "obs_scene"; scene: string }
+  | { type: "usage"; metric: Metric };
+export type Metric = "cpu" | "ram" | "temp";
 export type ActionType = Action["type"];
 
 export interface Button {
@@ -65,6 +67,7 @@ export interface ActionColors {
   hotkey: string;
   volume: string;
   obs_scene: string;
+  usage: string;
 }
 export interface KeyStyle {
   /** % of the button side, 0..=50 */
@@ -135,9 +138,17 @@ export interface LayoutPage {
   theme: Theme;
 }
 export type ServerMsg =
-  | { type: "layout"; pages: LayoutPage[]; grid: Grid; language: string; theme: Theme }
+  /** `build` identifies the phone page the app serves; it changes when the app is updated. */
+  | { type: "layout"; pages: LayoutPage[]; grid: Grid; language: string; theme: Theme; build: string }
   | { type: "result"; press_id: number; ok: boolean; error: ActionError | null }
+  | ({ type: "usage" } & Usage)
   | { type: "kicked" };
+/** Whole numbers: CPU and RAM in percent, temperature in °C; null = this PC does not report it. */
+export interface Usage {
+  cpu: number | null;
+  ram: number | null;
+  temp: number | null;
+}
 export type ClientMsg = { type: "press"; press_id: number; button_id: string };
 
 // Desktop events and command results (state.rs, commands.rs)

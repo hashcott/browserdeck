@@ -1,7 +1,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { createT } from "../../shared/i18n";
-import { KeyFace } from "../../shared/KeyFace";
+import { KeyFace, reading } from "../../shared/KeyFace";
 import type { ActionType, Button, Page, Theme } from "../../shared/types";
 import { ACTION_TYPES, ActionChip } from "./ActionPalette";
 import { Icon } from "./Icons";
@@ -101,7 +101,7 @@ function KeySlot(p: SlotCommon & { button: Button; theme: Theme; selected: boole
           if ((e.key === "Delete" || e.key === "Backspace") && !e.defaultPrevented) { e.preventDefault(); p.onAskDelete(b.id); }
           p.onKey(e);
         }}>
-        <KeyFace button={b} theme={p.theme} iconSrc={p.iconSrc} selected={p.selected} />
+        <KeyFace button={b} theme={p.theme} iconSrc={p.iconSrc} selected={p.selected} reading={reading(b, null, t)} />
       </button>
     </div>
   );
