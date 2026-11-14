@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security problems go through the private report instead (see SECURITY.md), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add a shortcut button with Ctrl+Shift+M
+        2. Press it on the phone while OBS has focus
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Browserdeck version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Press Win+R, type winver, press Enter.
+      placeholder: "Windows 11 23H2 (build 22631)"
+    validations:
+      required: true
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and browser
+      placeholder: "iPhone 13, Safari / Pixel 7, Chrome"
+  - type: input
+    id: obs
+    attributes:
+      label: OBS version (for OBS buttons)
+      placeholder: "30.2"
+  - type: dropdown
+    id: admin
+    attributes:
+      label: Administrator mode
+      options: ["Off", "On"]
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
+      description: The message the phone or the desktop showed helps a lot.
