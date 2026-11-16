@@ -109,16 +109,18 @@ async fn gate(State(state): State<Arc<AppState>>, req: Request, next: Next) -> R
     if !auth::verify(&expected, given) {
         return not_paired();
     }
-    // Valid token in the URL on the page: move it into a cookie and out of the address bar.
-    if from_query.is_some() && req.uri().path() == "/" {
+    // Valid token in the URL on the page: copy it into a cookie for the requests that carry no query (assets, /ws).
+    // The page stays on the token URL on purpose: iOS "Add to Home Screen" saves the address shown, and the
+    // home-screen app starts with a cookie jar of its own, so a saved "/" would open "Not paired".
+    let set_cookie = from_query.is_some() && req.uri().path() == "/";
+    let mut res = next.run(req).await;
+    if set_cookie {
         let cookie = format!("sd_token={expected}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000");
-        return (
-            StatusCode::SEE_OTHER,
-            [(header::LOCATION, "/".to_string()), (header::SET_COOKIE, cookie)],
-        )
-            .into_response();
+        if let Ok(v) = HeaderValue::from_str(&cookie) {
+            res.headers_mut().insert(header::SET_COOKIE, v);
+        }
     }
-    next.run(req).await
+    res
 }
 
 fn not_paired() -> Response {
@@ -239,6 +241,7 @@ async fn phone_session(state: Arc<AppState>, mut socket: WebSocket) {
             _ = ping.tick() => {
                 if last_rx.elapsed() >= IDLE_TIMEOUT
                     || socket.send(Message::Ping(Bytes::new())).await.is_err()
+                    || !send_msg(&mut socket, &ServerMsg::Ping).await
                 {
                     break;
                 }
@@ -366,7 +369,7 @@ mod tests {
     #[tokio::test]
     async fn admin_token_is_the_only_token_while_set() {
         let (app, _d) = elevated_app();
-        assert_eq!(get_from(&app, "/?token=admintok", None, LAN).await.status(), StatusCode::SEE_OTHER);
+        assert_eq!(get_from(&app, "/?token=admintok", None, LAN).await.status(), StatusCode::OK);
         assert_eq!(get_from(&app, "/?token=secret", None, LAN).await.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(get_from(&app, "/", OK, LAN).await.status(), StatusCode::UNAUTHORIZED);
     }
@@ -378,7 +381,7 @@ mod tests {
         assert_eq!(status(get_from(&app, "/?token=admintok", None, Some("127.0.0.1:5000")).await), StatusCode::FORBIDDEN);
         assert_eq!(status(get_from(&app, "/?token=admintok", None, Some("[::1]:5000")).await), StatusCode::FORBIDDEN);
         assert_eq!(status(get_from(&app, "/?token=admintok", None, None).await), StatusCode::FORBIDDEN);
-        assert_eq!(status(get_from(&app, "/?token=admintok", None, LAN).await), StatusCode::SEE_OTHER);
+        assert_eq!(status(get_from(&app, "/?token=admintok", None, LAN).await), StatusCode::OK);
     }
 
     #[tokio::test]
@@ -392,7 +395,7 @@ mod tests {
     async fn unelevated_server_accepts_this_pc() {
         let (app, _d) = app();
         let r = get_from(&app, "/?token=secret", None, Some("127.0.0.1:5000")).await;
-        assert_eq!(r.status(), StatusCode::SEE_OTHER);
+        assert_eq!(r.status(), StatusCode::OK);
     }
 
     #[cfg(windows)]
@@ -420,11 +423,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn right_query_token_redirects_and_sets_cookie() {
+    async fn right_query_token_serves_the_page_in_place_and_sets_cookie() {
         let (app, _d) = app();
         let r = get(&app, "/?token=secret", None).await;
-        assert_eq!(r.status(), StatusCode::SEE_OTHER);
-        assert_eq!(r.headers()[header::LOCATION], "/");
+        assert_eq!(r.status(), StatusCode::OK); // no redirect: iOS "Add to Home Screen" must save the token URL
+        assert!(r.headers()[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/html"));
         let c = r.headers()[header::SET_COOKIE].to_str().unwrap();
         assert!(c.contains("sd_token=secret") && c.contains("HttpOnly") && c.contains("SameSite=Strict"));
     }
@@ -482,7 +485,7 @@ mod tests {
 
     /// Same two checks as a manual curl against the running app, over a real socket.
     #[tokio::test]
-    async fn real_socket_303_with_cookie_and_401_without_token() {
+    async fn real_socket_200_with_cookie_and_401_without_token() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let (_, d) = app();
         let state = Arc::new(AppState::new(
@@ -503,7 +506,7 @@ mod tests {
             out
         };
         let ok = fetch("/?token=secret").await;
-        assert!(ok.starts_with("HTTP/1.1 303"), "{ok}");
+        assert!(ok.starts_with("HTTP/1.1 200"), "{ok}");
         assert!(ok.to_lowercase().contains("set-cookie: sd_token=secret"), "{ok}");
         assert!(fetch("/").await.starts_with("HTTP/1.1 401"));
     }

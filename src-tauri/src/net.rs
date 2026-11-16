@@ -27,6 +27,23 @@ pub fn lan_ips() -> Vec<Ipv4Addr> {
     )
 }
 
+/// This PC's mDNS name, which Windows (10 1703+), macOS and most Linux answer for on the LAN by themselves.
+/// Unlike an address it still reaches the PC after it gets a new IP.
+pub fn local_name() -> Option<String> {
+    sysinfo::System::host_name().and_then(|h| mdns_name(&h))
+}
+
+/// `name.local` for a host name that is one plain DNS label (a trailing `.local` is fine); None otherwise.
+fn mdns_name(host: &str) -> Option<String> {
+    let host = host.to_ascii_lowercase();
+    let label = host.trim_end_matches('.').trim_end_matches(".local");
+    let plain = (1..=63).contains(&label.len())
+        && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        && !label.starts_with('-')
+        && !label.ends_with('-');
+    plain.then(|| format!("{label}.local"))
+}
+
 /// Every address of every interface of this PC.
 pub fn own_ips() -> Vec<std::net::IpAddr> {
     if_addrs::get_if_addrs().unwrap_or_default().into_iter().map(|i| i.ip()).collect()
@@ -88,6 +105,15 @@ mod tests {
         // this PC, the internet (a UPnP-forwarded port), carrier NAT, link-local
         for p in ["192.168.1.20", "127.0.0.1", "8.8.8.8", "100.64.0.5", "169.254.3.3", "::1"] {
             assert!(!may_be_the_phone(p.parse().unwrap(), &own), "{p}");
+        }
+    }
+
+    #[test]
+    fn local_name_is_one_plain_label_dot_local() {
+        assert_eq!(mdns_name("DESKTOP-AB12").as_deref(), Some("desktop-ab12.local"));
+        assert_eq!(mdns_name("Hanhs-MacBook-Pro.local").as_deref(), Some("hanhs-macbook-pro.local"));
+        for bad in ["", ".local", "-pc", "pc-", "my pc", "pc.lan", "máy"] {
+            assert_eq!(mdns_name(bad), None, "{bad}");
         }
     }
 

@@ -151,7 +151,7 @@
   "status.obsUnsupported": "OBS quá cũ",
   "pairing.intro": "Mở camera trên điện thoại và hướng vào mã này. Điện thoại và máy tính này phải dùng chung WiFi.",
   "pairing.address": "Địa chỉ mạng",
-  "pairing.addressHint": "Tìm thấy nhiều mạng. Chọn mạng mà điện thoại đang dùng.",
+  "pairing.addressHint": "Chọn địa chỉ mà điện thoại kết nối được. Tên đuôi .local vẫn chạy khi máy tính đổi IP (iPhone, Android 12 trở lên).",
   "pairing.link": "Hoặc nhập địa chỉ này vào trình duyệt trên điện thoại",
   "pairing.secret": "Địa chỉ này chứa mã ghép. Đừng chia sẻ cho người khác.",
   "pairing.regenerateConfirm": "Mã mới sẽ ngắt điện thoại đang ghép và mã cũ hết dùng được. Tạo mã mới?",

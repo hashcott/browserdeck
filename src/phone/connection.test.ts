@@ -85,6 +85,22 @@ test("backoff returns to 500 ms after a successful connection", () => {
   vi.advanceTimersByTime(500);
   expect(FakeWS.all).toHaveLength(4);
 });
+test("a link silent for 35 s is dropped and dialled again; any message resets the clock", () => {
+  make(); last().open();
+  vi.advanceTimersByTime(34_999);
+  last().recv({ type: "ping" });
+  vi.advanceTimersByTime(34_999);
+  expect(statuses[statuses.length - 1]).toBe("open");
+  vi.advanceTimersByTime(1);
+  expect(statuses[statuses.length - 1]).toBe("closed");
+  vi.advanceTimersByTime(500);
+  expect(FakeWS.all).toHaveLength(2);
+});
+test("close() stops the silence check", () => {
+  const c = make(); last().open(); c.close();
+  vi.advanceTimersByTime(60_000);
+  expect(FakeWS.all).toHaveLength(1);
+});
 test("does not reconnect after kicked", () => {
   make(); last().open();
   last().recv({ type: "kicked" });
@@ -145,6 +161,6 @@ test("a late result after the timeout is ignored", async () => {
 });
 test("a second onclose does not schedule a second reconnect", () => {
   make(); const s = last(); s.drop(); s.onclose?.();
-  vi.advanceTimersByTime(60000);
+  vi.advanceTimersByTime(30000); // under the 35 s silence check, which would dial again
   expect(FakeWS.all).toHaveLength(2);
 });

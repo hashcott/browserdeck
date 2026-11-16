@@ -147,7 +147,9 @@ export type ServerMsg =
   | { type: "layout"; pages: LayoutPage[]; grid: Grid; language: string; theme: Theme; build: string }
   | { type: "result"; press_id: number; ok: boolean; error: ActionError | null }
   | ({ type: "usage" } & Usage)
-  | { type: "kicked" };
+  | { type: "kicked" }
+  /** Every 15 s: silence means the link is dead. */
+  | { type: "ping" };
 /** Whole numbers: CPU and RAM in percent, temperature in °C; null = this PC does not report it. */
 export interface Usage {
   cpu: number | null;

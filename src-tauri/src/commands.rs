@@ -202,12 +202,20 @@ pub async fn regenerate(
     Ok(pairing(state).await)
 }
 
-/// Pure: loopback, link-local and unspecified addresses are never offered.
-pub fn build_pairing_info(ips: &[Ipv4Addr], port: u16, token: &str, preferred: Option<&str>) -> PairingInfo {
-    let addresses: Vec<_> = ips
+/// Pure: loopback, link-local and unspecified addresses are never offered. `host` (the PC's `.local` name, carried
+/// in the `ip` field) comes last and only with a LAN address: it survives an IP change, but Android 11 and older
+/// cannot resolve it, so it is never the default.
+pub fn build_pairing_info(ips: &[Ipv4Addr], host: Option<&str>, port: u16, token: &str, preferred: Option<&str>) -> PairingInfo {
+    let ips: Vec<_> = ips
         .iter()
         .filter(|ip| !ip.is_loopback() && !ip.is_link_local() && !ip.is_unspecified())
-        .map(|ip| PairingAddress { ip: ip.to_string(), url: format!("http://{ip}:{port}/?token={token}") })
+        .map(|ip| ip.to_string())
+        .collect();
+    let host = host.filter(|_| !ips.is_empty()).map(str::to_string);
+    let addresses: Vec<_> = ips
+        .into_iter()
+        .chain(host)
+        .map(|ip| PairingAddress { url: format!("http://{ip}:{port}/?token={token}"), ip })
         .collect();
     let selected = preferred
         .filter(|p| addresses.iter().any(|a| a.ip == *p))
@@ -220,7 +228,8 @@ pub async fn pairing(state: &AppState) -> PairingInfo {
     let token = state.token().await;
     let c = state.config.read().await;
     let ips = net::lan_ips();
-    build_pairing_info(&ips, state.port.load(Ordering::Relaxed), &token, c.settings.preferred_ip.as_deref())
+    let host = net::local_name();
+    build_pairing_info(&ips, host.as_deref(), state.port.load(Ordering::Relaxed), &token, c.settings.preferred_ip.as_deref())
 }
 
 pub async fn status(state: &AppState) -> Status {
@@ -534,7 +543,7 @@ mod tests {
     async fn pairing_info_uses_real_port_and_token() {
         let f = fixture(Ok(()));
         f.state.port.store(47825, Ordering::Relaxed);
-        let info = build_pairing_info(&[ip("192.168.1.20")], 47825, "tok", None);
+        let info = build_pairing_info(&[ip("192.168.1.20")], None, 47825, "tok", None);
         assert_eq!(info.addresses[0].url, "http://192.168.1.20:47825/?token=tok");
         assert_eq!(info.selected.as_deref(), Some("192.168.1.20"));
         for a in pairing(&f.state).await.addresses {
@@ -545,19 +554,30 @@ mod tests {
     #[test]
     fn pairing_info_prefers_listed_ip_and_never_offers_loopback() {
         let ips = [ip("192.168.1.20"), ip("10.0.0.5"), ip("127.0.0.1"), ip("169.254.3.3")];
-        let info = build_pairing_info(&ips, 1, "t", Some("10.0.0.5"));
+        let info = build_pairing_info(&ips, None, 1, "t", Some("10.0.0.5"));
         assert_eq!(info.addresses.len(), 2);
         assert_eq!(info.selected.as_deref(), Some("10.0.0.5"));
-        assert_eq!(build_pairing_info(&ips, 1, "t", Some("10.9.9.9")).selected.as_deref(), Some("192.168.1.20"));
-        assert_eq!(build_pairing_info(&ips, 1, "t", Some("127.0.0.1")).selected.as_deref(), Some("192.168.1.20"));
+        assert_eq!(build_pairing_info(&ips, None, 1, "t", Some("10.9.9.9")).selected.as_deref(), Some("192.168.1.20"));
+        assert_eq!(build_pairing_info(&ips, None, 1, "t", Some("127.0.0.1")).selected.as_deref(), Some("192.168.1.20"));
     }
 
     #[test]
     fn pairing_info_with_no_lan_has_no_selection() {
-        let info = build_pairing_info(&[], 47821, "t", None);
+        let info = build_pairing_info(&[], None, 47821, "t", None);
         assert!(info.addresses.is_empty());
         assert_eq!(info.selected, None);
-        assert_eq!(build_pairing_info(&[], 47821, "t", Some("10.0.0.5")).selected, None);
+        assert_eq!(build_pairing_info(&[], None, 47821, "t", Some("10.0.0.5")).selected, None);
+    }
+
+    #[test]
+    fn pairing_info_offers_the_local_name_last_and_only_when_picked() {
+        let lan = [ip("192.168.1.20")];
+        let info = build_pairing_info(&lan, Some("pc.local"), 1, "t", None);
+        assert_eq!(info.addresses[1].url, "http://pc.local:1/?token=t");
+        assert_eq!(info.selected.as_deref(), Some("192.168.1.20"));
+        let picked = build_pairing_info(&lan, Some("pc.local"), 1, "t", Some("pc.local"));
+        assert_eq!(picked.selected.as_deref(), Some("pc.local"));
+        assert!(build_pairing_info(&[], Some("pc.local"), 1, "t", None).addresses.is_empty()); // no LAN, no QR
     }
 
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];

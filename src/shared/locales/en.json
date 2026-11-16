@@ -151,7 +151,7 @@
   "status.obsUnsupported": "OBS too old",
   "pairing.intro": "Open the camera on your phone and point it at this code. Your phone and this PC must be on the same WiFi.",
   "pairing.address": "Network address",
-  "pairing.addressHint": "Several networks found. Pick the one your phone is on.",
+  "pairing.addressHint": "Pick the one your phone is on. The name ending in .local keeps working when the PC gets a new IP (iPhone, Android 12 or newer).",
   "pairing.link": "Or type this address into your phone's browser",
   "pairing.secret": "This address contains the pairing code. Keep it private.",
   "pairing.regenerateConfirm": "A new code disconnects the phone that is paired now, and the old code stops working. Make a new code?",

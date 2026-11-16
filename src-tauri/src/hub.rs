@@ -16,6 +16,9 @@ pub enum ServerMsg {
     /// Every few seconds while a page has a usage key.
     Usage(crate::usage::Usage),
     Kicked,
+    /// With every WebSocket ping, which the page cannot see: a page that stops hearing these drops a link that died
+    /// without a close (the PC moved to a new IP) and dials again.
+    Ping,
 }
 
 /// The phone only ever says "button N was pressed"; nothing else is accepted.

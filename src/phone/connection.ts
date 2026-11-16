@@ -6,6 +6,8 @@ export type PressOutcome = { ok: true } | { ok: false; error: ActionError | "tim
 const PRESS_TIMEOUT_MS = 5000;
 const BACKOFF_START_MS = 500;
 const BACKOFF_MAX_MS = 5000;
+/** The app sends a ping every 15 s: two missed and the link is dead. */
+const SILENCE_MS = 35_000;
 
 type Timers = { setTimeout: (f: () => void, ms: number) => unknown; clearTimeout: (id: unknown) => void };
 // Looked up on each call so fake timers installed after import are honoured.
@@ -31,6 +33,7 @@ export function createConnection(opts: {
   let nextId = 1; // no crypto.randomUUID: it needs a secure context and the page is plain HTTP
   let delay = BACKOFF_START_MS;
   let retry: unknown;
+  let watchdog: unknown;
   let stopped = false;
   let build: string | null = null; // this page's build: the first one the app reports
 
@@ -42,11 +45,19 @@ export function createConnection(opts: {
     opts.onStatus("connecting");
     const s = new WS(opts.url);
     ws = s;
+    // A link that died without a close (the PC moved to a new IP) never fires onclose, so silence drops it.
+    const heard = () => {
+      if (ws !== s) return;
+      timers.clearTimeout(watchdog);
+      watchdog = timers.setTimeout(() => { lost(s); s.close(); }, SILENCE_MS);
+    };
+    heard();
     s.onopen = () => {
       delay = BACKOFF_START_MS;
       opts.onStatus("open");
     };
     s.onmessage = (e) => {
+      heard();
       let m: ServerMsg;
       try { m = JSON.parse(e.data as string) as ServerMsg; } catch { return; }
       if (m.type === "layout") {
@@ -65,15 +76,17 @@ export function createConnection(opts: {
         opts.onStatus("kicked");
       }
     };
-    s.onclose = () => {
-      if (ws !== s) return;
-      ws = null;
-      failAll();
-      if (stopped) return;
-      opts.onStatus("closed");
-      retry = timers.setTimeout(connect, delay);
-      delay = Math.min(delay * 2, BACKOFF_MAX_MS);
-    };
+    s.onclose = () => lost(s);
+  }
+  function lost(s: WebSocket) {
+    if (ws !== s) return;
+    ws = null;
+    timers.clearTimeout(watchdog);
+    failAll();
+    if (stopped) return;
+    opts.onStatus("closed");
+    retry = timers.setTimeout(connect, delay);
+    delay = Math.min(delay * 2, BACKOFF_MAX_MS);
   }
   connect();
 
@@ -97,6 +110,7 @@ export function createConnection(opts: {
     close() {
       stopped = true;
       timers.clearTimeout(retry);
+      timers.clearTimeout(watchdog);
       const s = ws;
       ws = null;
       failAll();
