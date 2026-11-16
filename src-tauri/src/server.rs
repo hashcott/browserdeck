@@ -73,6 +73,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/", get(index))
         .route("/assets/{*path}", get(asset))
         .route("/icons/{file}", get(icon))
+        .route("/glyphs/{set}/{file}", get(glyph))
         .route("/ws", get(ws_upgrade))
         .layer(middleware::from_fn_with_state(state.clone(), gate))
         .with_state(state)
@@ -177,6 +178,17 @@ async fn icon(State(state): State<Arc<AppState>>, Path(file): Path<String>) -> R
     match tokio::fs::read(state.data_dir.join("icons").join(&file)).await {
         Ok(bytes) => file_response(&file, bytes),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// A bundled key icon (scripts/glyphs.mjs puts them in dist/glyphs). Only the two sets and plain names pass.
+async fn glyph(Path((set, file)): Path<(String, String)>) -> Response {
+    let ok = matches!(set.as_str(), "ph" | "si") && file.strip_suffix(".svg").is_some_and(crate::config::is_glyph_name);
+    match Dist::get(&format!("glyphs/{set}/{file}")).filter(|_| ok) {
+        // The sets only change with an app update, which also reloads the phone page.
+        Some(f) => ([(header::CACHE_CONTROL, HeaderValue::from_static("max-age=86400"))], file_response(&file, f.data.into_owned()))
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
@@ -449,6 +461,14 @@ mod tests {
         let (app, d) = app();
         std::fs::write(d.path().join("config.json"), "{}").unwrap();
         for uri in ["/icons/..%2Fconfig.json", "/icons/config.json", "/assets/..%2F..%2FCargo.toml"] {
+            assert_eq!(get(&app, uri, OK).await.status(), StatusCode::NOT_FOUND, "{uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn glyph_outside_the_two_sets_or_with_a_strange_name_is_404() {
+        let (app, _d) = app();
+        for uri in ["/glyphs/xx/play.svg", "/glyphs/ph/..%2F..%2Fphone.html", "/glyphs/ph/Play.svg", "/glyphs/ph/play.png", "/glyphs/ph/ph.json"] {
             assert_eq!(get(&app, uri, OK).await.status(), StatusCode::NOT_FOUND, "{uri}");
         }
     }

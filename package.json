@@ -5,7 +5,9 @@
   "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/glyphs.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/glyphs.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "vitest",
     "tauri": "tauri"
@@ -20,10 +22,12 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@phosphor-icons/core": "^2.1.1",
     "@tauri-apps/cli": "^2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "simple-icons": "^16.37.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
     "vitest": "^2.0.0"

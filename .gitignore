@@ -9,3 +9,6 @@ PRODUCT.md
 DESIGN.md
 docs/superpowers/
 .impeccable/
+
+# key icon sets copied from node_modules by scripts/glyphs.mjs
+public/glyphs/

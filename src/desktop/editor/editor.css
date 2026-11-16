@@ -169,6 +169,15 @@ kbd { font: inherit; }
 .menu { position: fixed; z-index: 21; display: grid; gap: 2px; padding: 6px; border-radius: var(--r-lg); background: var(--rail); color: var(--text); box-shadow: 0 16px 36px -10px #000e, 0 0 0 1px var(--line); }
 .menu .act { cursor: pointer; }
 .menu.pop { width: 320px; max-width: calc(100vw - 16px); padding: 16px 16px 4px; background: var(--side); }
+/* icon library */
+.glyph-pop { width: 360px; gap: 10px; padding: 12px 12px 10px; }
+.glyph-pop .note { margin: 0; }
+.glyph { display: block; width: 24px; height: 24px; background: currentColor;
+  -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.glyph-grid { list-style: none; margin: 0; padding: 2px; display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; max-height: 280px; overflow-y: auto; }
+.glyph-grid button { all: unset; box-sizing: border-box; display: grid; place-items: center; width: 100%; aspect-ratio: 1; border-radius: var(--r); color: var(--text); cursor: pointer; }
+.glyph-grid button:hover { background: var(--hover); color: var(--head); }
+.glyph-grid button:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
 .pop h2 { margin: 0 0 16px; font-size: 16px; font-weight: 700; color: var(--head); overflow-wrap: anywhere; }
 .menu .act:hover, .menu .act:focus-visible { background: var(--hover); outline: none; }
 
@@ -212,6 +221,8 @@ input[type="number"].in { appearance: textfield; font-variant-numeric: tabular-n
 input[type="number"].in::-webkit-inner-spin-button, input[type="number"].in::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .icon-row { display: flex; gap: 8px; align-items: center; }
 .icon-prev { width: 38px; height: 38px; object-fit: contain; border-radius: var(--r); background: var(--field); flex: none; }
+span.icon-prev { display: grid; place-items: center; color: var(--head); }
+.fld .icon-row + .icon-row { margin-top: 8px; }
 .color-row { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
 .color-row .btn { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding-inline: 10px; }
 .preset { all: unset; box-sizing: border-box; position: relative; width: 28px; height: 28px; border-radius: 6px; background: var(--c); box-shadow: inset 0 0 0 1px #ffffff26; cursor: pointer; flex: none; }
@@ -222,6 +233,7 @@ input[type="number"].in::-webkit-inner-spin-button, input[type="number"].in::-we
 .swatch { width: 40px; height: 34px; padding: 3px; border-radius: var(--r); border: 0; background: var(--field); cursor: pointer; flex: none; }
 .swatch::-webkit-color-swatch-wrapper { padding: 0; }
 .swatch::-webkit-color-swatch { border: 0; border-radius: 6px; box-shadow: inset 0 0 0 1px #ffffff26; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: var(--r); background: var(--field); }
 .grid-fields { margin: 14px 0 0; }
 .seg label { display: block; position: relative; }

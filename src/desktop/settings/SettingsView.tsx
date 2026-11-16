@@ -61,10 +61,10 @@ export interface SettingsViewProps {
 }
 
 const SAMPLE: Button[] = [
-  { id: "a", slot: 0, label: "", icon: { kind: "emoji", value: "🚀" }, color: null, action: { type: "launch", path: "", args: [], admin: false } },
-  { id: "b", slot: 1, label: "", icon: { kind: "emoji", value: "⌨️" }, color: null, action: { type: "hotkey", keys: [] } },
-  { id: "c", slot: 2, label: "", icon: { kind: "emoji", value: "🔊" }, color: null, action: { type: "volume", op: "up" } },
-  { id: "d", slot: 3, label: "", icon: { kind: "emoji", value: "🎬" }, color: null, action: { type: "obs_scene", scene: "" } },
+  { id: "a", slot: 0, label: "", icon: { kind: "glyph", set: "ph", name: "rocket-launch" }, color: null, action: { type: "launch", path: "", args: [], admin: false } },
+  { id: "b", slot: 1, label: "", icon: { kind: "glyph", set: "ph", name: "keyboard" }, color: null, action: { type: "hotkey", keys: [] } },
+  { id: "c", slot: 2, label: "", icon: { kind: "glyph", set: "ph", name: "speaker-high" }, color: null, action: { type: "volume", op: "up" } },
+  { id: "d", slot: 3, label: "", icon: { kind: "glyph", set: "ph", name: "broadcast" }, color: null, action: { type: "obs_scene", scene: "" } },
 ];
 const LANGS = ["auto", "en", "vi"] as const;
 const OBS_TEXT: Record<ObsState, [string, string | null]> = {

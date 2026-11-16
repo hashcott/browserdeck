@@ -1,7 +1,9 @@
 // Mirrors the Rust serde output (snake_case). The Rust code is the source of truth:
 // config.rs, themes.rs, hub.rs, state.rs, actions/mod.rs, commands.rs.
 
-export type Icon = { kind: "emoji"; value: string } | { kind: "image"; file: string };
+export type GlyphSet = "ph" | "si";
+/** glyph: a bundled icon (ph = Phosphor Fill, si = Simple Icons logos), drawn in the key's ink colour. */
+export type Icon = { kind: "emoji"; value: string } | { kind: "image"; file: string } | { kind: "glyph"; set: GlyphSet; name: string };
 export type VolumeOp = "up" | "down" | "mute";
 export type Action =
   | { type: "launch"; path: string; args: string[]; admin: boolean }

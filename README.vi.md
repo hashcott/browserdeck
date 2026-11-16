@@ -28,7 +28,7 @@ Browserdeck chạy trên máy Windows cạnh OBS. App hiện một lưới nút 
 
 - **Sáu loại nút:** mở app, gửi phím tắt, đổi âm lượng hệ thống (tăng, giảm, tắt tiếng), điều khiển media (bài trước, phát/dừng, bài sau, cho YouTube, Spotify hay thứ đang phát), chuyển scene OBS, và nút hiện trực tiếp CPU, RAM hoặc nhiệt độ máy.
 - **Không cần app điện thoại:** chỉ cần trình duyệt. Quét mã QR là có nút.
-- **Chỉnh trên máy tính:** kéo hành động vào lưới, kéo nút để đổi chỗ, chọn nhãn, emoji hoặc ảnh, và màu. Điện thoại cập nhật ngay.
+- **Chỉnh trên máy tính:** kéo hành động vào lưới, kéo nút để đổi chỗ, chọn nhãn, icon (khoảng 1.500 icon có sẵn, 3.400 logo app, emoji hoặc ảnh của bạn), và màu. Điện thoại cập nhật ngay.
 - **Nhiều trang** nút, **bốn theme nút** (hoặc [tự làm theme](docs/themes.md)). Mỗi trang có thể có theme và kích thước lưới riêng.
 - **Chỉ điện thoại của bạn:** ghép bằng mã bí mật trong QR, người khác cùng WiFi không bấm được. Mỗi lần một điện thoại.
 - **Gọn gàng:** chạy ở khay hệ thống, có thể khởi động cùng Windows.
@@ -93,3 +93,5 @@ Báo lỗi, góp ý và pull request đều được chào đón: [CONTRIBUTING.
 Browserdeck là phần mềm tự do theo [GNU General Public License v3.0](LICENSE). Bạn được dùng, tìm hiểu, chia sẻ và sửa đổi. Nếu chia sẻ, dù đã sửa hay chưa, bạn phải chia sẻ kèm mã nguồn theo cùng giấy phép.
 
 Bản quyền © 2026 Harry Nguyen.
+
+Icon phím lấy từ [Phosphor Icons](https://phosphoricons.com) (giấy phép MIT, bản quyền © 2023 Phosphor Icons; giấy phép đi kèm bộ icon) và logo app từ [Simple Icons](https://simpleicons.org) (CC0). Logo vẫn là thương hiệu của chủ sở hữu.

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import "./key.css";
+import { glyphUrl } from "./glyphs";
 import { isLight, keyColor, pickInk, themeVars } from "./theme";
 import type { Button, Theme, Usage } from "./types";
 
@@ -49,6 +50,7 @@ export function KeyFace({ button, theme, iconSrc, pressed, selected, error, disa
   const style = { ...themeVars(theme), "--key-bg": bg, "--key-ink": pickInk(bg, theme, 4.5) } as CSSProperties;
   const icon = button.icon;
   const label = button.label || reading?.name;
+  const glyph = icon.kind === "glyph" ? glyphUrl(icon.set, icon.name) : undefined;
   return (
     <div className={cls} style={style}>
       <div className="key-cap">
@@ -56,6 +58,8 @@ export function KeyFace({ button, theme, iconSrc, pressed, selected, error, disa
         <span className="key-value">{reading.value}</span>
       ) : icon.kind === "emoji" ? (
         icon.value && <span className="key-icon" aria-hidden={button.label ? true : undefined}>{icon.value}</span>
+      ) : icon.kind === "glyph" ? (
+        glyph && <span className="key-icon key-glyph" aria-hidden="true" style={{ maskImage: `url(${glyph})`, WebkitMaskImage: `url(${glyph})` }} />
       ) : (
         iconSrc && <img className="key-icon" src={iconSrc} alt="" draggable={false} />
       )}

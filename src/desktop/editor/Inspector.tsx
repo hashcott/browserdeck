@@ -1,10 +1,12 @@
 import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import type { createT } from "../../shared/i18n";
-import type { ActionType, Button, MediaOp, Metric, ObsState, VolumeOp } from "../../shared/types";
+import type { Action, ActionType, Button, MediaOp, Metric, ObsState, VolumeOp } from "../../shared/types";
 import { keyInk } from "../../shared/theme";
 import { formatArgs, parseArgs } from "./args";
 import { HotkeyRecorder } from "./HotkeyRecorder";
-import { MEDIA_ICON } from "./layout";
+import { defaultIcon, sameIcon } from "./layout";
+import { Glyph, GlyphPicker } from "./GlyphPicker";
+import { brandColor } from "../../shared/glyphs";
 import { keyName } from "../../shared/KeyFace";
 import { Icon } from "./Icons";
 import "../screens.css"; // .switch
@@ -55,6 +57,8 @@ export function Inspector(p: InspectorProps) {
     );
   }
   const set = (patch: Partial<Button>, slow = false) => p.onChange({ ...b, ...patch }, slow);
+  // Choosing another operation: a key still showing the old default icon takes the new one; an icon the user set stays.
+  const setAction = (action: Action) => set({ action, ...(sameIcon(b.icon, defaultIcon(b.action)) ? { icon: defaultIcon(action) } : {}) });
   const a = b.action;
   const result = p.testResult?.id === b.id ? p.testResult : null;
 
@@ -69,9 +73,17 @@ export function Inspector(p: InspectorProps) {
       {a.type !== "usage" && <Field label={t("editor.icon")} id={`${id}i`}>
         <div className="icon-row">
           {b.icon.kind === "image" && p.iconSrc && <img className="icon-prev" src={p.iconSrc} alt="" />}
+          {b.icon.kind === "glyph" && <span className="icon-prev"><Glyph set={b.icon.set} name={b.icon.name} /></span>}
           <input id={`${id}i`} className="in emoji" value={b.icon.kind === "emoji" ? b.icon.value : ""} maxLength={16}
-            placeholder={b.icon.kind === "image" ? t("editor.iconImage") : t("editor.iconEmoji")}
+            placeholder={b.icon.kind === "image" ? t("editor.iconImage") : b.icon.kind === "glyph" ? b.icon.name : t("editor.iconEmoji")}
             onChange={(e) => set({ icon: { kind: "emoji", value: e.target.value } }, true)} />
+        </div>
+        <div className="icon-row">
+          {/* a logo brings its brand colour: NVIDIA green, Spotify green, YouTube red */}
+          <GlyphPicker t={t} onPick={(g) => {
+            const color = brandColor(g.hex);
+            set({ icon: { kind: "glyph", set: g.set, name: g.name }, ...(color ? { color } : {}) });
+          }} />
           <button type="button" className="btn small" onClick={p.onPickImage}><Icon name="image" size={16} />{t("editor.iconPick")}</button>
         </div>
       </Field>}
@@ -126,7 +138,7 @@ export function Inspector(p: InspectorProps) {
           <div className="seg" role="radiogroup" aria-label={t("action.volume")}>
             {VOLUME.map((op) => (
               <label key={op}>
-                <input type="radio" name={`${id}v`} checked={a.op === op} onChange={() => set({ action: { ...a, op } })} />
+                <input type="radio" name={`${id}v`} checked={a.op === op} onChange={() => setAction({ ...a, op })} />
                 <span>{t(`volume.${op}`)}</span>
               </label>
             ))}
@@ -139,9 +151,7 @@ export function Inspector(p: InspectorProps) {
           <div className="seg" role="radiogroup" aria-label={t("action.media")}>
             {MEDIA.map((op) => (
               <label key={op}>
-                <input type="radio" name={`${id}d`} checked={a.op === op}
-                  onChange={() => set({ action: { ...a, op }, // the default icon follows the choice; one the user set stays
-                    ...(b.icon.kind === "emoji" && b.icon.value === MEDIA_ICON[a.op] ? { icon: { kind: "emoji", value: MEDIA_ICON[op] } } : {}) })} />
+                <input type="radio" name={`${id}d`} checked={a.op === op} onChange={() => setAction({ ...a, op })} />
                 <span>{t(`media.${op}`)}</span>
               </label>
             ))}

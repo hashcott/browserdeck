@@ -1,7 +1,14 @@
-import type { Action, Button, Grid, MediaOp, Page } from "../../shared/types";
+import type { Action, Button, Grid, Icon, MediaOp, Page, VolumeOp } from "../../shared/types";
 
-const EMOJI: Record<Action["type"], string> = { launch: "🚀", hotkey: "⌨️", volume: "🔊", obs_scene: "🎬", usage: "📊", media: "⏯️" };
-export const MEDIA_ICON: Record<MediaOp, string> = { previous: "⏮️", play_pause: "⏯️", next: "⏭️" };
+// Phosphor names: a new key's icon, per action type, and per operation for volume and media keys.
+const GLYPH: Record<Action["type"], string> = { launch: "rocket-launch", hotkey: "keyboard", volume: "speaker-high", obs_scene: "broadcast", usage: "cpu", media: "play-pause" };
+const OP_GLYPH: Record<VolumeOp | MediaOp, string> = { up: "speaker-high", down: "speaker-low", mute: "speaker-x", previous: "skip-back", play_pause: "play-pause", next: "skip-forward" };
+
+export function defaultIcon(a: Action): Icon {
+  return { kind: "glyph", set: "ph", name: a.type === "volume" || a.type === "media" ? OP_GLYPH[a.op] : GLYPH[a.type] };
+}
+
+export const sameIcon = (a: Icon, b: Icon): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 export function defaultAction(type: Action["type"]): Action {
   switch (type) {
@@ -15,8 +22,7 @@ export function defaultAction(type: Action["type"]): Action {
 }
 
 export function newButton(id: string, slot: number, action: Action): Button {
-  const value = action.type === "media" ? MEDIA_ICON[action.op] : EMOJI[action.type];
-  return { id, slot, label: "", icon: { kind: "emoji", value }, color: null, action };
+  return { id, slot, label: "", icon: defaultIcon(action), color: null, action };
 }
 
 /** What dropping an action on an empty slot creates. Media makes a player row (previous, play/pause, next)

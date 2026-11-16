@@ -73,6 +73,31 @@ pub struct Button {
 pub enum Icon {
     Emoji { value: String },
     Image { file: String },
+    /// One of the bundled icon sets, drawn in the key's ink colour.
+    Glyph { set: GlyphSet, name: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum GlyphSet {
+    /// Phosphor, Fill weight.
+    Ph,
+    /// Simple Icons brand logos.
+    Si,
+}
+
+impl GlyphSet {
+    pub fn dir(self) -> &'static str {
+        match self {
+            GlyphSet::Ph => "ph",
+            GlyphSet::Si => "si",
+        }
+    }
+}
+
+/// An icon name as the sets spell them; it ends up in a URL and a CSS `url()`, so nothing else gets through.
+pub fn is_glyph_name(name: &str) -> bool {
+    (1..=64).contains(&name.len()) && name.bytes().all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-'))
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -147,11 +172,11 @@ fn rand_id() -> String {
 
 impl Config {
     pub fn default_with_token(token: String) -> Config {
-        let volume = |slot, op, emoji: &str| Button {
+        let volume = |slot, op, glyph: &str| Button {
             id: rand_id(),
             slot,
             label: String::new(),
-            icon: Icon::Emoji { value: emoji.into() },
+            icon: Icon::Glyph { set: GlyphSet::Ph, name: glyph.into() },
             color: None,
             action: Action::Volume { op },
         };
@@ -173,9 +198,9 @@ impl Config {
                 id: rand_id(),
                 name: "1".into(),
                 buttons: vec![
-                    volume(0, VolumeOp::Down, "\u{1F509}"),
-                    volume(1, VolumeOp::Up, "\u{1F50A}"),
-                    volume(2, VolumeOp::Mute, "\u{1F507}"),
+                    volume(0, VolumeOp::Down, "speaker-low"),
+                    volume(1, VolumeOp::Up, "speaker-high"),
+                    volume(2, VolumeOp::Mute, "speaker-x"),
                 ],
                 grid: None,
                 theme: None,
@@ -237,10 +262,13 @@ impl Config {
                         return Err(BadColor);
                     }
                 }
-                if let Icon::Image { file } = &b.icon {
-                    if !is_icon_file_name(file) {
-                        return Err(BadIconFile);
-                    }
+                let icon_ok = match &b.icon {
+                    Icon::Image { file } => is_icon_file_name(file),
+                    Icon::Glyph { name, .. } => is_glyph_name(name),
+                    Icon::Emoji { .. } => true,
+                };
+                if !icon_ok {
+                    return Err(BadIconFile);
                 }
             }
         }
@@ -389,6 +417,12 @@ mod tests {
         let mut c = cfg();
         c.pages[0].buttons[0].icon = Icon::Image { file: "../x.png".into() };
         assert_eq!(c.validate(), Err(ConfigError::BadIconFile));
+        for bad in ["", "../x", "play)", "Play", "a b", &"a".repeat(65)] {
+            c.pages[0].buttons[0].icon = Icon::Glyph { set: GlyphSet::Ph, name: bad.into() };
+            assert_eq!(c.validate(), Err(ConfigError::BadIconFile), "{bad:?}");
+        }
+        c.pages[0].buttons[0].icon = Icon::Glyph { set: GlyphSet::Si, name: "obsstudio".into() };
+        assert_eq!(c.validate(), Ok(()));
         assert!(!is_icon_file_name("not-a-uuid.png"));
         assert!(is_icon_file_name("01234567-89ab-cdef-0123-456789abcdef.webp"));
     }

@@ -33,7 +33,7 @@ Browserdeck runs on your Windows PC next to OBS. It shows a grid of buttons on y
 
 - **Six button types:** open an app, send a keyboard shortcut, change the system volume (up, down, mute), control media (previous, play/pause, next, for YouTube, Spotify or whatever is playing), switch OBS scene, and a live system reading (CPU, RAM or temperature) shown on the key.
 - **No phone app:** the phone only needs a browser. Scan a QR code and the buttons are there.
-- **Set up on the PC:** drag actions onto the grid, drag buttons to reorder them, pick a label, an emoji or image, and a colour. Changes show on the phone at once.
+- **Set up on the PC:** drag actions onto the grid, drag buttons to reorder them, pick a label, an icon (about 1,500 built-in icons, 3,400 app logos, an emoji or your own image), and a colour. Changes show on the phone at once.
 - **Several pages** of buttons, and **four button themes** (or [make your own](docs/themes.md)). Each page can have its own theme and grid size.
 - **Only your phone:** pairing uses a secret code in the QR code, so others on the same WiFi cannot press your buttons. One phone at a time.
 - **Stays out of the way:** runs in the system tray and can start with Windows.
@@ -98,3 +98,5 @@ Bug reports, ideas and pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING
 Browserdeck is free software under the [GNU General Public License v3.0](LICENSE). You may use, study, share and change it. If you share it, changed or not, you must share its source code under the same license.
 
 Copyright © 2026 Harry Nguyen.
+
+Key icons come from [Phosphor Icons](https://phosphoricons.com) (MIT License, copyright © 2023 Phosphor Icons; the license ships with the icons) and app logos from [Simple Icons](https://simpleicons.org) (CC0). Logos remain the trademarks of their owners.

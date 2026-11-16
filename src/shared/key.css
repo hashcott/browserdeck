@@ -38,6 +38,9 @@
 }
 .key-icon { font-size: max(22px, 30cqw); line-height: 1; flex: none; width: max-content; max-width: 100%; }
 .key-value { font-weight: 800; font-size: max(18px, 24cqw); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
+/* A bundled icon: the key's ink, cut out by the icon's shape. */
+.key-glyph { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; background: currentColor;
+  -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
 img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; object-fit: contain; }
 .key-label {
   font-weight: 800;
@@ -98,7 +101,7 @@ img.key-icon { width: 30cqw; height: 30cqw; min-width: 22px; min-height: 22px; o
   .key-icon ~ .key-label, .key-value ~ .key-label { display: none; }
   .key-icon { font-size: 52cqw; }
   .key-value { font-size: 30cqw; }
-  img.key-icon { width: 52cqw; height: 52cqw; }
+  img.key-icon, .key-glyph { width: 52cqw; height: 52cqw; }
 }
 
 @media (prefers-reduced-motion: reduce) { .key-cap { transition: none; } }
